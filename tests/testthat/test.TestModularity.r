@@ -88,11 +88,12 @@ test_that("MantelModTest returns correct results for non-landmark data",
             mod.cor = matrix(NA, 12, 12)
             mod.cor[ hypot.mask] = runif(length(mod.cor[ hypot.mask]), 0.8, 0.9) # within-modules
             mod.cor[!hypot.mask] = runif(length(mod.cor[!hypot.mask]), 0.3, 0.4) # between-modules
+            # Replicate the lower triangle to make it symmetric:
+            mod.cor[upper.tri(mod.cor)] = t(mod.cor)[upper.tri(mod.cor)]
             diag(mod.cor) = 1
             
             result = MantelModTest(cor.hypot, mod.cor)
             expect_equal(result, expect)
-            mod.cor<-(mod.cor+t(mod.cor))/2
             result = MantelModTest(cor.hypot, mod.cor, MHI = TRUE)
             expect_equal(CalcAVG(cor.hypot, mod.cor), result[3:5])
           })

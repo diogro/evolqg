@@ -35,7 +35,7 @@
 #' @rdname MantelCor
 #' @references http://en.wikipedia.org/wiki/Mantel_test
 #' @author Diogo Melo, Guilherme Garcia
-#' @seealso \code{\link{KrzCor}},\code{\link{RandomSkewers}},\code{\link{mantel}},\code{\link{RandomSkewers}},\code{\link{TestModularity}}, \code{\link{MantelModTest}}
+#' @seealso \code{\link{KrzCor}},\code{\link{RandomSkewers}},\code{\link[vegan]{mantel}},\code{\link{RandomSkewers}},\code{\link{TestModularity}}, \code{\link{MantelModTest}}
 #' @examples
 #' c1 <- RandomMatrix(10, 1, 1, 10)
 #' c2 <- RandomMatrix(10, 1, 1, 10)

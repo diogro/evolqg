@@ -82,7 +82,7 @@ Porto, Arthur, Felipe B. Oliveira, Leila T. Shirai, Valderes Conto, and Gabriel 
 Modularity and Morphometrics: Error Rates in Hypothesis Testing Guilherme Garcia, Felipe Bandoni de Oliveira, Gabriel Marroig bioRxiv 030874; doi: http://dx.doi.org/10.1101/030874
 }
 \seealso{
-\code{\link{mantel}},\code{\link{MantelCor}},\code{\link{CalcAVG}},\code{\link{TestModularity}}
+\code{\link[vegan]{mantel}},\code{\link{MantelCor}},\code{\link{CalcAVG}},\code{\link{TestModularity}}
 }
 \author{
 Diogo Melo, Guilherme Garcia
