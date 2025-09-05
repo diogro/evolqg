@@ -11,7 +11,7 @@
 #' @importFrom methods is
 #' @importFrom stats anova confint cor cor.test cov cov2cor lm mahalanobis princomp quantile reorder residuals rnorm runif sd var
 #' @importFrom utils write.csv write.table
-NULL
+"_PACKAGE"
 
 #' Linear distances for five mouse lines
 #'

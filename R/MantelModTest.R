@@ -23,7 +23,7 @@
 #' 
 #' Modularity and Morphometrics: Error Rates in Hypothesis Testing Guilherme Garcia, Felipe Bandoni de Oliveira, Gabriel Marroig bioRxiv 030874; doi: http://dx.doi.org/10.1101/030874
 #' @author Diogo Melo, Guilherme Garcia
-#' @seealso \code{\link{mantel}},\code{\link{MantelCor}},\code{\link{CalcAVG}},\code{\link{TestModularity}}
+#' @seealso \code{\link[vegan]{mantel}},\code{\link{MantelCor}},\code{\link{CalcAVG}},\code{\link{TestModularity}}
 #' @examples
 #' # Create a single modularity hypothesis:
 #' hypot = rep(c(1, 0), each = 6)
