@@ -20,7 +20,10 @@
     stop("parallel = TRUE requires the 'foreach' package and a registered ",
          "parallel backend (e.g. doParallel::registerDoParallel()).", call. = FALSE)
   `%dopar%` <- foreach::`%dopar%`
-  worker <- function(element) FUN(element, ...)
+  # pass extra arguments as a list rather than through `...` in the closure,
+  # which codetools flags when foreach exports it to the workers
+  extra.args <- list(...)
+  worker <- function(element) do.call(FUN, c(list(element), extra.args))
   element <- NULL # silence R CMD check note about the foreach iterator
   out <- foreach::foreach(element = X) %dopar% worker(element)
   names(out) <- names(X)
