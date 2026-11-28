@@ -22,6 +22,14 @@ a named vector with the mean correlations and derived statistics
 Uses a binary correlation matrix as a mask to calculate average within- and between-module
 correlations. Also calculates the ratio between them and the Modularity Hypothesis Index.
 }
+\details{
+The Modularity Hypothesis Index (MHI) is defined here as
+\code{(AVG+ - AVG-)} divided by the standard deviation of the eigenvalues of
+\code{cor.matrix} (\code{CalcEigenVar(cor.matrix, sd = TRUE, rel = FALSE)}), that is,
+the difference between within- and between-module correlations scaled by the
+overall integration of the matrix. With \code{MHI = FALSE} the AVG Ratio
+\code{AVG+ / AVG-} is returned instead.
+}
 \examples{
 # Module vectors
 modules = matrix(c(rep(c(1, 0, 0), each = 5),

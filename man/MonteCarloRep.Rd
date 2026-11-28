@@ -56,13 +56,13 @@ MonteCarloRep(cov.matrix, sample.size = 30, KrzCor, correlation = TRUE)
 
 #Creating repeatability vector for a list of matrices
 mat.list <- RandomMatrix(5, 3, 1, 10)
-laply(mat.list, MonteCarloRep, 30, KrzCor, correlation = TRUE)
+sapply(mat.list, MonteCarloRep, 30, KrzCor, correlation = TRUE)
 }
 
 \dontrun{
 #Multiple threads can be used with some foreach backend library, like doMC or doParallel
-library(doMC)
-registerDoMC(cores = 2)
+library(doParallel)
+registerDoParallel(cores = 2)
 MonteCarloRep(cov.matrix, 30, RandomSkewers, iterations = 100, parallel = TRUE)
 }
 }

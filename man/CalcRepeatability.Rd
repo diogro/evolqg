@@ -9,7 +9,7 @@ CalcRepeatability(ID, ind.data)
 \arguments{
 \item{ID}{identity of individuals}
 
-\item{ind.data}{individual measurements}
+\item{ind.data}{individual measurements (matrix, data.frame or a vector for a single trait)}
 }
 \value{
 vector of repeatabilities
@@ -18,7 +18,10 @@ vector of repeatabilities
 Estimates the variance in the sample not due to measurement error
 }
 \note{
-Requires at least two observations per individual
+Requires at least two observations per individual. The among-individual
+  variance is computed with the coefficient n0 of Lessells and Boag (1987), so
+  unbalanced designs (different numbers of measurements per individual) are handled.
+  For exactly two measurements per individual n0 is 2.
 }
 \examples{
 num.ind = length(iris[,1])

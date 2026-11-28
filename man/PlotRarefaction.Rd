@@ -38,12 +38,13 @@ b <- PlotRarefaction(results.Mantel, "Mantel")
 c <- PlotRarefaction(results.KrzCov, "KrzCor")
 d <- PlotRarefaction(results.PCA, "PCAsimilarity")
 
-library(cowplot)
-plot_grid(a, b, c, d, labels = c("RS",
-                                 "Mantel Correlation",
-                                 "Krzanowski Correlation",
-                                 "PCA Similarity"),
-                      scale = 0.9)
+if (requireNamespace("cowplot", quietly = TRUE)) {
+  cowplot::plot_grid(a, b, c, d, labels = c("RS",
+                                            "Mantel Correlation",
+                                            "Krzanowski Correlation",
+                                            "PCA Similarity"),
+                     scale = 0.9)
+}
 }
 }
 \seealso{

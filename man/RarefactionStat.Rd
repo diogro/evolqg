@@ -30,36 +30,41 @@ RarefactionStat(
 \item{parallel}{if TRUE computations are done in parallel. Some foreach backend must be registered, like doParallel or doMC.}
 }
 \value{
-returns the mean value of comparisons from samples to original statistic, for all sample sizes.
+a list with one numeric vector (of length \code{num.reps}) for each sample size, from 3 to the number of individuals, named by sample size.
+Each value is the (first element of the) comparison between the statistic of a sample and the statistic of the full data.
 }
 \description{
 Calculates the repeatability of a statistic of the data, such as
 correlation or covariance matrix, via resampling with
-varying sample sizes, from 2 to the size of the original data.
+varying sample sizes, from 3 to the size of the original data.
 }
 \details{
-Samples of various sizes, without replacement, are taken from the full population, a statistic calculated and compared to the full population statistic.
+Samples of various sizes, by default without replacement (see \code{replace}), are taken from the full population, a statistic calculated and compared to the full population statistic.
 
 A specialized ploting function displays the results in publication quality.
 
 Bootstraping may be misleading with very small sample sizes. Use with caution.
+
+All samples are drawn in the main process, in the same order whether or not \code{parallel = TRUE}; only the statistics and
+comparisons are computed in parallel. If \code{StatFunc} raises a warning for a sample, the sample is redrawn, up to 100 times,
+and then kept with a single summary warning. If \code{StatFunc} already warns on the full data, no samples are redrawn.
+Data frames are converted to matrices once when \code{StatFunc} is \code{cov} or \code{cor}.
 }
 \examples{
 ind.data <- iris[1:50,1:4]
 
 #Can be used to calculate any statistic via Rarefaction, not just comparisons
 #Integration, for example:
-results.R2 <- RarefactionStat(ind.data, cor, function(x, y) CalcR2(y), num.reps = 5)
+results.R2 <- RarefactionStat(ind.data, cor, function(x, y) CalcEigenVar(y), num.reps = 5)
 
 #Easy access
-library(reshape2)
-melt(results.R2)
+sapply(results.R2, mean)
 
 \dontrun{
 #Multiple threads can be used with some foreach backend library, like doMC or doParallel
-library(doMC)
-registerDoMC(cores = 2)
-results.R2 <- RarefactionStat(ind.data, cor, function(x, y) CalcR2(y), parallel = TRUE)
+library(doParallel)
+registerDoParallel(cores = 2)
+results.R2 <- RarefactionStat(ind.data, cor, function(x, y) CalcEigenVar(y), parallel = TRUE)
 }
 }
 \seealso{

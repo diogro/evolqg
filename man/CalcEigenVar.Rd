@@ -25,7 +25,11 @@ theoretical maximum.}
 the expected integration value for that particular sample size and returns 
 value as a deviation from the expected.}
 
-\item{keep.positive}{Logical. If TRUE, non-positive eigenvalues are removed from calculation}
+\item{keep.positive}{Logical. If TRUE, non-positive eigenvalues are removed from calculation.
+The matrix is then treated as having as many dimensions as it has positive
+eigenvalues (its rank): the number of eigenvalues, the mean, the theoretical
+maximum and the sample size correction are all computed with that number
+instead of the number of rows.}
 }
 \value{
 Integration index based on eigenvalue dispersion.
@@ -51,6 +55,11 @@ provided, the function automatically calculates the expected integration
 value for a matrix of the same size but with no integration (e.g. a matrix 
 with all eigenvalues equal). In that case, the result is given as a deviation 
 from the expected and is invariant to sample size (Wagner, 1984).
+
+If \code{sd = TRUE} and \code{sample} is given, the observed variance minus its
+expected value can be negative (the matrix is less integrated than expected
+by chance). The square root is then undefined and the function returns
+\code{NA} with a warning.
 }
 \examples{
 cov.matrix <- RandomMatrix(10, 1, 1, 10)

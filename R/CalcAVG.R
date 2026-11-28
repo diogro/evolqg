@@ -6,6 +6,12 @@
 #' @param cor.matrix Observed empirical correlation matrix.
 #' @param MHI Indicates if Modularity Hypothesis Index should be calculated instead of AVG Ratio.
 #' @param landmark.dim Used if within-landmark correlations are to be excluded in geometric morphometric data. Either 2 for 2d data or 3 for 3d data. Default is NULL for non geometric morphomotric data.
+#' @details The Modularity Hypothesis Index (MHI) is defined here as
+#' \code{(AVG+ - AVG-)} divided by the standard deviation of the eigenvalues of
+#' \code{cor.matrix} (\code{CalcEigenVar(cor.matrix, sd = TRUE, rel = FALSE)}), that is,
+#' the difference between within- and between-module correlations scaled by the
+#' overall integration of the matrix. With \code{MHI = FALSE} the AVG Ratio
+#' \code{AVG+ / AVG-} is returned instead.
 #' @return a named vector with the mean correlations and derived statistics
 #' @export
 #' @examples
