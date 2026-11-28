@@ -1,0 +1,42 @@
+# Check CRAN packages that depend on evolqg against this version.
+# Run manually before a release (Actions tab > revdep-check > Run workflow).
+on:
+  workflow_dispatch:
+
+name: revdep-check
+
+permissions: read-all
+
+jobs:
+  revdep-check:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      _R_CHECK_FORCE_SUGGESTS_: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::pak
+      - name: Check reverse dependencies
+        run: |
+          db <- available.packages(repos = "https://cloud.r-project.org")
+          revdeps <- tools::package_dependencies("evolqg", db = db, reverse = TRUE,
+                                                 which = c("Depends", "Imports", "LinkingTo", "Suggests"))[[1]]
+          cat("Reverse dependencies:", revdeps, "\n")
+          dir.create("revdep")
+          for (pkg in revdeps) {
+            pak::pkg_install(pkg, dependencies = TRUE, upgrade = FALSE)
+            download.packages(pkg, destdir = "revdep", repos = "https://cloud.r-project.org")
+          }
+          # installing the revdeps' Suggests pulls evolqg from CRAN: put this version back
+          install.packages(".", repos = NULL, type = "source")
+          cat("Checking against evolqg", as.character(packageVersion("evolqg")), "\n")
+          res <- tools::check_packages_in_dir("revdep", check_args = "--no-manual")
+          print(summary(res))
+          if (any(grepl("ERROR", unlist(lapply(file.path("revdep", paste0(revdeps, ".Rcheck"), "00check.log"), readLines)))))
+            stop("A reverse dependency fails its check with this version of evolqg")
+        shell: Rscript {0}
