@@ -4,13 +4,7 @@
 \alias{KrzSubspaceBootstrap}
 \title{Quasi-Bayesian Krzanowski subspace comparison}
 \usage{
-KrzSubspaceBootstrap(
-  x,
-  rep = 1,
-  MCMCsamples = 1000,
-  parallel = FALSE,
-  k = NULL
-)
+KrzSubspaceBootstrap(x, rep = 1, MCMCsamples = 1000, parallel = FALSE, k = 3)
 }
 \arguments{
 \item{x}{list of linear models from which P-matrices should be calculated}
@@ -21,7 +15,8 @@ KrzSubspaceBootstrap(
 
 \item{parallel}{if TRUE computations are done in parallel. Some foreach backend must be registered, like doParallel or doMC.}
 
-\item{k}{number of dimensions to be retained in calculating the subspace.}
+\item{k}{number of dimensions to be retained in calculating the subspace.
+Default is 3. It must not be larger than the number of traits.}
 }
 \value{
 A list with the observed and randomized eigenvalue distributions for the posterior Krz Subspace comparisons.
@@ -31,7 +26,10 @@ Calculates the usual Krzanowski subspace comparison using a posterior samples
 for a set of phenotypic covariance matrices. Then, this observed comparison 
 is contrasted to the subspace comparison across a permutation of the original
 data. Residuals, which are used to calculate the observed P-matrices, are 
-shuffled across groups. This process is repeated, creating a null distribution
+permuted across groups: in each replicate the pooled residuals are shuffled
+once and split into groups with the original sample sizes, so each residual
+is used exactly once. The null P-matrices are computed with the same degrees
+of freedom as the observed ones. This process is repeated, creating a null distribution
 of  subspace comparisons under the hypothesis that all P-matrices come from the
 same population. This method is a modification on the fully Bayesian method 
 proposed in Aguirre et. al 2013 and improved in Morrisey et al 2019.
@@ -44,7 +42,8 @@ data(ratones)
 
 model_formula = paste("cbind(", paste(names(ratones)[13:20], collapse = ", "), ") ~ SEX")
 lm_models = dlply(ratones, .(LIN), function(df) lm(as.formula(model_formula), data = df))
-krz_comparsion = KrzSubspaceBootstrap(lm_models, rep = 100, MCMCsamples = 1000)
+# small rep and MCMCsamples to reduce run time, actual values should be larger
+krz_comparsion = KrzSubspaceBootstrap(lm_models, rep = 5, MCMCsamples = 50)
 krz_df = KrzSubspaceDataFrame(krz_comparsion)
 PlotKrzSubspace(krz_df)
 }

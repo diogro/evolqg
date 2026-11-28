@@ -11,13 +11,18 @@ PhyloW(tree, tip.data, tip.sample.size = NULL)
 
 \item{tip.data}{list of tip nodes covariance matrices}
 
-\item{tip.sample.size}{vector of tip nodes sample sizes}
+\item{tip.sample.size}{vector of tip nodes sample sizes. If named, names must match the tip labels (order does not matter); if unnamed, it must be in the same order as \code{tip.data}.}
 }
 \value{
 list with calculated within-group matrices, using labels or numbers from tree
 }
 \description{
 Calculates weighted average of covariances matrices along a phylogeny, returning a withing-group covariance matrice for each node.
+}
+\note{
+Internal node names are taken from \code{tree$node.label}. If these are missing, empty, repeated
+(e.g. bootstrap support values) or repeat a tip label, they cannot identify nodes, so a warning is issued
+and all internal nodes are named by their node numbers instead.
 }
 \examples{
 library(ape)

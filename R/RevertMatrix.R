@@ -12,7 +12,8 @@
 #' @param scaled should we treat each score as a value given in standard 
 #' deviations for each eigentensor? Defaults to TRUE
 #' 
-#' @return A symmetric covariance matrix with k traits
+#' @return A symmetric covariance matrix with k traits. It is the exact inverse of \code{\link{ProjectMatrix}}:
+#' \code{ProjectMatrix(RevertMatrix(scores, etd, scaled = FALSE), etd)} returns \code{scores}.
 #' 
 #' @references Basser P. J., Pajevic S. 2007. Spectral decomposition of a 4th-order 
 #' covariance tensor: Applications to diffusion tensor MRI. Signal Processing. 87:220-236.
@@ -54,7 +55,6 @@
 #' plot(srd.et2)
 #'
 #' @export
-#' @importFrom expm expm
 #' 
 #' @rdname RevertMatrix
 #' 
@@ -71,18 +71,17 @@ RevertMatrix <-
     {
       warning('More scores provided than actual eigentensors in etd. \n',
               'Using only the first ', n.dim, ' scores.')
-      values <- values [1:n.dim]
+      values <- values [seq_len(n.dim)]
     }
     
     if(scaled)
       values <- values * sqrt(etd $ values)
     
-    rebuilt <- aaply (1:n.dim, 1, function (i)
-      etd $ matrices [, , i] * values [i])
+    k <- dim(etd $ matrices) [1]
+    rebuilt <- matrix (matrix (etd $ matrices, k * k) %*% values, k, k)
     
-    rebuilt <- aaply (rebuilt, c(2, 3), sum)
-    
-    out.mat <- etd $ mean.sqrt %*% expm (rebuilt) %*% etd $ mean.sqrt
+    out.mat <- etd $ mean.sqrt %*% .sym_expm (rebuilt) %*% etd $ mean.sqrt
+    out.mat <- (out.mat + t(out.mat)) / 2
     
     if(!is.null(dimnames(etd $ matrices)))
       dimnames(out.mat) <- dimnames(etd $ matrices) [1:2]

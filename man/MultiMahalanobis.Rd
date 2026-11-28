@@ -11,13 +11,21 @@ MultiMahalanobis(means, cov.matrix, parallel = FALSE)
 
 \item{cov.matrix}{a single covariance matrix defining the scale (or metric tensor) to be used in the distance calculation.}
 
-\item{parallel}{if TRUE computations are done in parallel. Some foreach backend must be registered, like doParallel or doMC.}
+\item{parallel}{Deprecated and ignored. Distances are computed in a single vectorised step.}
 }
 \value{
-returns a matrix of species-species distances.
+returns a matrix of species-species (non-squared) Mahalanobis distances. If there is a single mean, a 1 x 1 matrix with a zero is returned.
 }
 \description{
 Calculates the Mahalanobis distance between a list of species mean, using a global covariance matrix
+}
+\details{
+The Mahalanobis distance between two means x and y is
+d(x, y) = sqrt((x - y)' S^-1 (x - y)), where S is the covariance matrix
+given in \code{cov.matrix} and S^-1 is its inverse. It is the euclidean
+distance after rescaling the trait space by S. The function computes this
+distance (not squared) for all pairs of means, using the same shared
+covariance matrix S for every pair.
 }
 \examples{
 mean.1 <- colMeans(matrix(rnorm(30*10), 30, 10))
@@ -38,15 +46,9 @@ mean.array = array(1:36, c(9, 4))
 mat = RandomMatrix(4)
 MultiMahalanobis(mean.array, mat)
 
-\dontrun{
-#Multiple threads can be used with some foreach backend library, like doMC or doParallel
-library(doMC)
-registerDoMC(cores = 2)
-MultiMahalanobis(mean.list, RandomMatrix(10), parallel = TRUE)
-}
 }
 \references{
-http://en.wikipedia.org/wiki/Mahalanobis_distance
+Mahalanobis, P. C. (1936). On the generalised distance in statistics. Proceedings of the National Institute of Sciences of India 2: 49-55.
 }
 \seealso{
 \code{\link{mahalanobis}}

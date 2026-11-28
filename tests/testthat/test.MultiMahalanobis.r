@@ -1,45 +1,65 @@
-test_that("MultiMahalanobis returns correct results on lists",
-{
+reference_mahalanobis <- function(means, S) {
+  n <- nrow(means)
+  d <- matrix(0, n, n)
+  for (i in seq_len(n)) for (j in seq_len(n))
+    d[i, j] <- sqrt(mahalanobis(means[i, ], means[j, ], S))
+  d
+}
+
+test_that("MultiMahalanobis returns correct results on lists", {
+  local_seed(1)
   mean.1 <- colMeans(matrix(rnorm(30*10), 30, 10))
   mean.2 <- colMeans(matrix(rnorm(30*10), 30, 10))
   mean.3 <- colMeans(matrix(rnorm(30*10), 30, 10))
   mean.list <- list(mean.1, mean.2, mean.3)
   euclidian <- MultiMahalanobis(mean.list, diag(rep(1, 10)))
   half.euclidian <- MultiMahalanobis(mean.list, diag(rep(0.5, 10)))
-  expect_that((euclidian**2)*2, equals(half.euclidian**2))
-  expect_that(euclidian, is_a("matrix"))
-  expect_that(dim(euclidian), equals(c(3,3)))
-  expect_that(euclidian[1,2], equals(sqrt(mahalanobis(mean.1, mean.2, diag(rep(1, 10))))))
-  expect_that(euclidian[1,3], equals(sqrt(mahalanobis(mean.1, mean.3, diag(rep(1, 10))))))
+  expect_equal((euclidian**2)*2, half.euclidian**2)
+  expect_true(is.matrix(euclidian))
+  expect_equal(dim(euclidian), c(3,3))
+  expect_equal(euclidian[1,2], sqrt(mahalanobis(mean.1, mean.2, diag(rep(1, 10)))))
+  expect_equal(euclidian[1,3], sqrt(mahalanobis(mean.1, mean.3, diag(rep(1, 10)))))
   expect_true(isSymmetric(half.euclidian))
   cov_matrix = RandomMatrix(10, 1, 1, 10)
   random_dist = MultiMahalanobis(mean.list, cov_matrix)
-  expect_that(random_dist[1,2], equals(sqrt(mahalanobis(mean.1, mean.2, cov_matrix))))
-  expect_that(random_dist[1,3], equals(sqrt(mahalanobis(mean.1, mean.3, cov_matrix))))
+  expect_equal(random_dist[1,2], sqrt(mahalanobis(mean.1, mean.2, cov_matrix)))
+  expect_equal(random_dist[1,3], sqrt(mahalanobis(mean.1, mean.3, cov_matrix)))
   expect_true(isSymmetric(random_dist))
-  expect_that(MultiMahalanobis(mean.list, array(1:100, c(10, 10))), throws_error("covariance matrix must be symmetric."))
-}
-)
-test_that("MultiMahalanobis returns correct results on arrays",
-{
+  expect_equal(rownames(random_dist), c("1", "2", "3"))
+  expect_error(MultiMahalanobis(mean.list, array(1:100, c(10, 10))), "covariance matrix must be symmetric.")
+})
+
+test_that("MultiMahalanobis returns correct results on arrays", {
+  local_seed(2)
   mean.1 <- colMeans(matrix(rnorm(30*10), 30, 10))
   mean.2 <- colMeans(matrix(rnorm(30*10), 30, 10))
   mean.3 <- colMeans(matrix(rnorm(30*10), 30, 10))
   mean.array <- rbind(mean.1, mean.2, mean.3)
   euclidian <- MultiMahalanobis(mean.array, diag(rep(1, 10)))
   half.euclidian <- MultiMahalanobis(mean.array, diag(rep(0.5, 10)))
-  expect_that((euclidian**2)*2, equals(half.euclidian**2))
-  expect_that(euclidian, is_a("matrix"))
-  expect_that(dim(euclidian), equals(c(3,3)))
-  expect_that(euclidian[1,2], equals(sqrt(mahalanobis(mean.1, mean.2, diag(rep(1, 10))))))
-  expect_that(euclidian[1,3], equals(sqrt(mahalanobis(mean.1, mean.3, diag(rep(1, 10))))))
-  expect_true(isSymmetric(half.euclidian))
+  expect_equal((euclidian**2)*2, half.euclidian**2)
+  expect_equal(dim(euclidian), c(3,3))
+  expect_equal(euclidian[1,2], sqrt(mahalanobis(mean.1, mean.2, diag(rep(1, 10)))))
   cov_matrix = RandomMatrix(10, 1, 1, 10)
   random_dist = MultiMahalanobis(mean.array, cov_matrix)
-  expect_that(random_dist[1,2], equals(sqrt(mahalanobis(mean.1, mean.2, cov_matrix))))
-  expect_that(random_dist[1,3], equals(sqrt(mahalanobis(mean.1, mean.3, cov_matrix))))
-  expect_true(isSymmetric(random_dist))
-  expect_that(MultiMahalanobis(mean.array, array(1:100, c(10, 10))), throws_error("covariance matrix must be symmetric."))
-  expect_that(MultiMahalanobis(data.frame(mean.array), array(1:100, c(10, 10))), throws_error("means must be in a list or an array."))
-}
-)
+  expect_equal(random_dist[1,3], sqrt(mahalanobis(mean.1, mean.3, cov_matrix)))
+  expect_equal(dimnames(random_dist), list(rownames(mean.array), rownames(mean.array)))
+  expect_equal(random_dist, reference_mahalanobis(mean.array, cov_matrix), ignore_attr = TRUE)
+  expect_error(MultiMahalanobis(mean.array, array(1:100, c(10, 10))), "covariance matrix must be symmetric.")
+  expect_error(MultiMahalanobis(data.frame(mean.array), array(1:100, c(10, 10))), "means must be in a list or an array.")
+})
+
+test_that("MultiMahalanobis agrees with pairwise mahalanobis on many means", {
+  local_seed(3)
+  means <- matrix(rnorm(20*6), 20, 6, dimnames = list(paste0("sp", 1:20), NULL))
+  S <- RandomMatrix(6, 1, 1, 10)
+  expect_equal(MultiMahalanobis(means, S), reference_mahalanobis(means, S),
+               tolerance = 1e-10, ignore_attr = TRUE)
+  expect_equal(rownames(MultiMahalanobis(means, S)), paste0("sp", 1:20))
+})
+
+test_that("MultiMahalanobis works with a single mean", {
+  out <- MultiMahalanobis(list(a = 1:3), diag(3))
+  expect_equal(out, matrix(0, 1, 1, dimnames = list("a", "a")))
+  expect_equal(dim(MultiMahalanobis(matrix(1:3, 1), diag(3))), c(1, 1))
+})

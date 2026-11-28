@@ -14,16 +14,16 @@
 #' @param ... additional arguments passed to MantelCor
 #' @param landmark.dim Used if permutations should be performed maintaining landmark structure in geometric morphometric data. Either 2 for 2d data or 3 for 3d data. Default is NULL for non geometric morphometric data.
 #' @param withinLandmark Logical. If TRUE within-landmark correlation are used in calculation of correlation. Only used if landmark.dim is passed, default is FALSE.
+#' @param perm.matrix Optional matrix of permutations (one per row, as built internally for the list method) used for the Mantel test instead of drawing new ones. Ignored if \code{landmark.dim} is given.
 #' @return Returns a vector with the matrix correlation, significance via Mantel, within- and between module correlation.
 #' @export
-#' @importFrom vegan mantel
 #' @importFrom Matrix bdiag
 #' @rdname MantelModTest
 #' @references Porto, Arthur, Felipe B. Oliveira, Leila T. Shirai, Valderes Conto, and Gabriel Marroig. 2009. "The Evolution of Modularity in the Mammalian Skull I: Morphological Integration Patterns and Magnitudes." Evolutionary Biology 36 (1): 118-35. doi:10.1007/s11692-008-9038-3.
 #' 
 #' Modularity and Morphometrics: Error Rates in Hypothesis Testing Guilherme Garcia, Felipe Bandoni de Oliveira, Gabriel Marroig bioRxiv 030874; doi: http://dx.doi.org/10.1101/030874
 #' @author Diogo Melo, Guilherme Garcia
-#' @seealso \code{\link[vegan]{mantel}},\code{\link{MantelCor}},\code{\link{CalcAVG}},\code{\link{TestModularity}}
+#' @seealso \code{\link{MantelCor}},\code{\link{CalcAVG}},\code{\link{TestModularity}}
 #' @examples
 #' # Create a single modularity hypothesis:
 #' hypot = rep(c(1, 0), each = 6)
@@ -42,6 +42,7 @@
 #' mod.cor = (mod.cor + t(mod.cor))/2 # correlation matrices should be symmetric
 #' 
 #' MantelModTest(cor.hypot, mod.cor)
+#' @details The list method uses the same set of permutations for every hypothesis (except when \code{landmark.dim} is given, where \code{\link{MantelCor}} is called for each one). Hypotheses with no within-module pairs (all-zero, or modules with a single trait) or with all trait pairs within modules give an undefined correlation, and a warning is issued.
 #' @keywords matrixcomparison
 #' @keywords matrixcorrelation
 #' @keywords manteltest
@@ -52,10 +53,23 @@ MantelModTest <- function (cor.hypothesis, cor.matrix, ...) UseMethod("MantelMod
 #' @export
 MantelModTest.default <- function (cor.hypothesis, cor.matrix,
                                    permutations = 1000, MHI = FALSE, ..., 
-                                   landmark.dim = NULL, withinLandmark = FALSE) {
-  if(!any(cor.hypothesis == 0 | cor.hypothesis == 1)) stop("modularity hypothesis matrix should be binary")
-  mantel.output <- MantelCor(cor.matrix, cor.hypothesis, permutations = permutations,
-                             MHI, landmark.dim = landmark.dim, withinLandmark = FALSE, mod = TRUE, ...)
+                                   landmark.dim = NULL, withinLandmark = FALSE,
+                                   perm.matrix = NULL) {
+  if(!all(cor.hypothesis == 0 | cor.hypothesis == 1)) stop("modularity hypothesis matrix should be binary")
+  pairs <- cor.hypothesis[lower.tri(cor.hypothesis)]
+  if(all(pairs == 0))
+    warning("Hypothesis has no within-module trait pairs (all zeros or only single-trait modules); the correlation is undefined.")
+  else if(all(pairs == 1))
+    warning("Hypothesis places all traits in a single module (all ones); the correlation is undefined.")
+  if(is.null(landmark.dim)){
+    mantel.output <- suppressWarnings(
+      .mantel_test(cor.matrix, cor.hypothesis, permutations, perm.matrix))
+    mantel.output <- c("rho" = mantel.output$statistic, "Probability" = mantel.output$signif)
+  } else{
+    mantel.output <- MantelCor(cor.matrix, cor.hypothesis, permutations = permutations,
+                               MHI, landmark.dim = landmark.dim, withinLandmark = withinLandmark, 
+                               mod = TRUE, ...)
+  }
   output = c(mantel.output, 
              CalcAVG(cor.hypothesis, cor.matrix, MHI, landmark.dim))
   return (output)
@@ -69,11 +83,15 @@ MantelModTest.list <- function (cor.hypothesis, cor.matrix,
                                 landmark.dim = NULL, withinLandmark = FALSE,
                                 ..., 
                                 parallel = FALSE){
+  perm.matrix <- NULL
+  if(is.null(landmark.dim)) # one set of permutations shared by all hypotheses
+    perm.matrix <- .mantel_permutations(nrow(cor.matrix), permutations)
   output <- SingleComparisonMap(cor.hypothesis, cor.matrix,
                                 function(x, y) MantelModTest(x, y,
-                                                             permutations, MHI, 
+                                                             permutations, MHI, ...,
                                                              landmark.dim = landmark.dim,
-                                                             withinLandmark = withinLandmark),
+                                                             withinLandmark = withinLandmark,
+                                                             perm.matrix = perm.matrix),
                                 parallel = parallel)
   return(output)
 }

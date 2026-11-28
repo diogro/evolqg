@@ -12,13 +12,17 @@
 #' @param StatFunc Function for calculating the statistic
 #' @param parallel if TRUE computations are done in parallel. Some foreach back-end must be registered, like doParallel or doMC.
 #' @details Since this function uses multivariate normal model to generate populations, only covariance matrices should be used.
-#' @return returns the mean repeatability, or mean value of comparisons from samples to original statistic.
+#'
+#' The random populations are simulated in the main process, in the same order whether or not
+#' \code{parallel = TRUE}; only the statistics are computed in parallel.
+#' Populations whose comparison fails or is NA are redrawn up to 100 times, then an error is raised;
+#' a single warning reports that redraws happened.
+#' @return a data frame with one row per random population: a factor column \code{X1} with the
+#'   population number and the comparison values (named as the result of \code{ComparisonFunc}, or V1, V2, ...).
 #' @author Diogo Melo, Guilherme Garcia
 #' @seealso \code{\link{BootstrapRep}}, \code{\link{AlphaRep}}
 #' @rdname MonteCarloStat
 #' @export
-#' @import plyr
-#' @importFrom mvtnorm rmvnorm
 #' @examples
 #' cov.matrix <- RandomMatrix(5, 1, 1, 10)
 #'
@@ -31,16 +35,9 @@
 #' quantile(r2.dist)
 #' 
 #' \dontrun{
-#' #Multiple threads can be used with some foreach backend library, like doMC or doParallel
-
-#' ##Windows:
-#' #cl <- makeCluster(2)
-#' #registerDoParallel(cl)
-#' 
-#' ##Mac and Linux:
+#' #Multiple threads can be used with some foreach backend library, like doParallel
 #' library(doParallel)
 #' registerDoParallel(cores = 2)
-#' 
 #' MonteCarloStat(cov.matrix, sample.size = 30, iterations = 100,
 #'                ComparisonFunc = function(x, y) KrzCor(x, y)[1],
 #'                StatFunc = cov,
@@ -52,33 +49,23 @@
 MonteCarloStat <- function (cov.matrix, sample.size, iterations,
                             ComparisonFunc, StatFunc,
                             parallel = FALSE) {
+  if(any(is.na(cov.matrix))) stop("covariance matrix has missing values.")
   if(!isSymmetric(cov.matrix)) stop("covariance matrix must be symmetric.")
-  if(sum(diag(cov.matrix)) == dim(cov.matrix)[1]) warning("Matrix appears to be a correlation matrix! Only covariance matrices should be used in parametric resampling.")
-  populations <- alply(1:iterations, 1,
-                        function(x) rmvnorm (sample.size, sigma = cov.matrix, method = 'svd'),
-                        .parallel=parallel)
-  comparisons <- ldply (populations, 
-                        doComparisonMC, ComparisonFunc, StatFunc, cov.matrix, sample.size,
-                        .parallel = parallel)
-  return (comparisons)
+  if(.is_cor_matrix(cov.matrix)) warning("Matrix appears to be a correlation matrix! Only covariance matrices should be used in parametric resampling.")
+  # the matrix root is fixed, so it is computed once; the random draws are
+  # the same as those of mvtnorm::rmvnorm(method = "svd")
+  root <- .mvn_root(cov.matrix, "svd")
+  # all populations are simulated here, in order, so that parallel and serial
+  # runs use the same populations
+  populations <- lapply(seq_len(iterations),
+                        function(i) .rmvnorm(sample.size, root = root))
+  worker <- function(x)
+    .compute_with_retry(x,
+                        function(pop) ComparisonFunc(cov.matrix, StatFunc(pop)),
+                        function() .rmvnorm(sample.size, root = root))
+  .collect_comparisons(.evq_lapply(populations, worker, parallel = parallel), "Monte Carlo")
 }
 
-
-#' @importFrom mvtnorm rmvnorm
-doComparisonMC <- function (x, ComparisonFunc, StatFunc, cov.matrix, sample.size){
-  while(TRUE){
-    out = tryCatch(ComparisonFunc (cov.matrix, StatFunc(x)), 
-                   error = function(c) {
-                     "Error in MonteCarlo sample, trying again"
-                     return(NA)
-                   })
-    if(any(is.na(out)))
-      x = rmvnorm (sample.size, sigma = cov.matrix, method = 'svd')
-    else
-      break
-  }
-  return(out)
-}
 #' Parametric repeatabilities with covariance or correlation matrices
 #'
 #' Using a multivariate normal model, random populations are generated
@@ -99,8 +86,6 @@ doComparisonMC <- function (x, ComparisonFunc, StatFunc, cov.matrix, sample.size
 #' @seealso \code{\link{BootstrapRep}}, \code{\link{AlphaRep}}
 #' @rdname MonteCarloRep
 #' @export
-#' @import plyr
-#' @importFrom mvtnorm rmvnorm
 #' @examples
 #' cov.matrix <- RandomMatrix(5, 1, 1, 10)
 #'
@@ -116,13 +101,13 @@ doComparisonMC <- function (x, ComparisonFunc, StatFunc, cov.matrix, sample.size
 #'
 #' #Creating repeatability vector for a list of matrices
 #' mat.list <- RandomMatrix(5, 3, 1, 10)
-#' laply(mat.list, MonteCarloRep, 30, KrzCor, correlation = TRUE)
+#' sapply(mat.list, MonteCarloRep, 30, KrzCor, correlation = TRUE)
 #'}
 #'
 #' \dontrun{
 #' #Multiple threads can be used with some foreach backend library, like doMC or doParallel
-#' library(doMC)
-#' registerDoMC(cores = 2)
+#' library(doParallel)
+#' registerDoParallel(cores = 2)
 #' MonteCarloRep(cov.matrix, 30, RandomSkewers, iterations = 100, parallel = TRUE)
 #' }
 #' @keywords parametricsampling
@@ -160,8 +145,6 @@ MonteCarloRep <- function(cov.matrix,
 #' @author Diogo Melo Guilherme Garcia
 #' @seealso \code{\link{BootstrapRep}}, \code{\link{AlphaRep}}
 #' @export
-#' @import plyr
-#' @importFrom mvtnorm rmvnorm
 #' @examples
 #' r2.dist <- MonteCarloR2(RandomMatrix(10, 1, 1, 10), 30)
 #' quantile(r2.dist)
@@ -171,7 +154,7 @@ MonteCarloRep <- function(cov.matrix,
 MonteCarloR2 <- function (cov.matrix, sample.size, iterations = 1000, parallel = FALSE) {
   it.r2 <- MonteCarloStat(cov.matrix, sample.size, iterations,
                           ComparisonFunc = function(x, y) y,
-                          StatFunc = function(x) CalcR2(cor(x)),
+                          StatFunc = function(x) .r2(cor(x)),
                           parallel = parallel)
   return (it.r2[,2])
 }

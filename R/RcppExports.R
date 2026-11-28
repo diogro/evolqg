@@ -2,10 +2,26 @@
 # Generator token: 10BE3573-1514-4C36-9D1C-5A225CD40393
 
 RS <- function(x, y, num_vectors) {
-    .Call('_evolqg_RS', PACKAGE = 'evolqg', x, y, num_vectors)
+    .Call(`_evolqg_RS`, x, y, num_vectors)
 }
 
 delta_z_corr <- function(x, y, num_vectors, random_vectors) {
-    .Call('_evolqg_delta_z_corr', PACKAGE = 'evolqg', x, y, num_vectors, random_vectors)
+    .Call(`_evolqg_delta_z_corr`, x, y, num_vectors, random_vectors)
+}
+
+.mantel_perm_cor_cpp <- function(x, y, rows, cols, perms) {
+    .Call(`_evolqg_mantel_perm_cor`, x, y, rows, cols, perms)
+}
+
+.rand_corr_partial_cpp <- function(n, ke) {
+    .Call(`_evolqg_rand_corr_partial`, n, ke)
+}
+
+.rand_lkj_cpp <- function(k, shape) {
+    .Call(`_evolqg_rand_lkj`, k, shape)
+}
+
+.combine_hypot_cpp <- function(hypot, masks) {
+    .Call(`_evolqg_combine_hypot`, hypot, masks)
 }
 

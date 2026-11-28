@@ -16,7 +16,13 @@ CalcR2CvCorrected(ind.data, ...)
   ...
 )
 
-\method{CalcR2CvCorrected}{lm}(ind.data, cv.level = 0.06, iterations = 1000, ...)
+\method{CalcR2CvCorrected}{lm}(
+  ind.data,
+  cv.level = 0.06,
+  iterations = 1000,
+  parallel = FALSE,
+  ...
+)
 }
 \arguments{
 \item{ind.data}{Matrix of individual measurments, or adjusted linear model}
@@ -36,13 +42,18 @@ List with adjusted integration indexes, fitted models and simulated distribution
 Calculates the Young correction for integration, using bootstrap resampling
 Warning: CalcEigenVar is strongly preferred and should probably be used in place of this function..
 }
+\details{
+For linear models with more than one predictor, individuals are grouped by the
+combination (interaction) of all the factors in the model. Resamples in which some group has a single
+individual are drawn again (up to 100 times in a row).
+}
 \examples{
-\dontrun{
-integration.dist = CalcR2CvCorrected(iris[,1:4])
+integration.dist = CalcR2CvCorrected(iris[,1:4], iterations = 100)
 
 #adjusted values
 integration.dist[[1]]
 
+\dontrun{
 #ploting models
 library(ggplot2)
 ggplot(integration.dist$dist, aes(r2, mean_cv)) + geom_point() +

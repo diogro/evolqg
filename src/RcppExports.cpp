@@ -12,29 +12,80 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
 // RS
-arma::mat RS(arma::mat x, arma::mat y, int num_vectors);
+arma::mat RS(const arma::mat& x, const arma::mat& y, int num_vectors);
 RcppExport SEXP _evolqg_RS(SEXP xSEXP, SEXP ySEXP, SEXP num_vectorsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< arma::mat >::type x(xSEXP);
-    Rcpp::traits::input_parameter< arma::mat >::type y(ySEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type x(xSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type y(ySEXP);
     Rcpp::traits::input_parameter< int >::type num_vectors(num_vectorsSEXP);
     rcpp_result_gen = Rcpp::wrap(RS(x, y, num_vectors));
     return rcpp_result_gen;
 END_RCPP
 }
 // delta_z_corr
-arma::vec delta_z_corr(arma::mat x, arma::mat y, int num_vectors, arma::mat random_vectors);
+arma::vec delta_z_corr(const arma::mat& x, const arma::mat& y, int num_vectors, const arma::mat& random_vectors);
 RcppExport SEXP _evolqg_delta_z_corr(SEXP xSEXP, SEXP ySEXP, SEXP num_vectorsSEXP, SEXP random_vectorsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< arma::mat >::type x(xSEXP);
-    Rcpp::traits::input_parameter< arma::mat >::type y(ySEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type x(xSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type y(ySEXP);
     Rcpp::traits::input_parameter< int >::type num_vectors(num_vectorsSEXP);
-    Rcpp::traits::input_parameter< arma::mat >::type random_vectors(random_vectorsSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type random_vectors(random_vectorsSEXP);
     rcpp_result_gen = Rcpp::wrap(delta_z_corr(x, y, num_vectors, random_vectors));
+    return rcpp_result_gen;
+END_RCPP
+}
+// mantel_perm_cor
+NumericVector mantel_perm_cor(const NumericMatrix& x, const NumericVector& y, const IntegerVector& rows, const IntegerVector& cols, const IntegerMatrix& perms);
+RcppExport SEXP _evolqg_mantel_perm_cor(SEXP xSEXP, SEXP ySEXP, SEXP rowsSEXP, SEXP colsSEXP, SEXP permsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const NumericMatrix& >::type x(xSEXP);
+    Rcpp::traits::input_parameter< const NumericVector& >::type y(ySEXP);
+    Rcpp::traits::input_parameter< const IntegerVector& >::type rows(rowsSEXP);
+    Rcpp::traits::input_parameter< const IntegerVector& >::type cols(colsSEXP);
+    Rcpp::traits::input_parameter< const IntegerMatrix& >::type perms(permsSEXP);
+    rcpp_result_gen = Rcpp::wrap(mantel_perm_cor(x, y, rows, cols, perms));
+    return rcpp_result_gen;
+END_RCPP
+}
+// rand_corr_partial
+NumericMatrix rand_corr_partial(int n, double ke);
+RcppExport SEXP _evolqg_rand_corr_partial(SEXP nSEXP, SEXP keSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< int >::type n(nSEXP);
+    Rcpp::traits::input_parameter< double >::type ke(keSEXP);
+    rcpp_result_gen = Rcpp::wrap(rand_corr_partial(n, ke));
+    return rcpp_result_gen;
+END_RCPP
+}
+// rand_lkj
+NumericMatrix rand_lkj(int k, double shape);
+RcppExport SEXP _evolqg_rand_lkj(SEXP kSEXP, SEXP shapeSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< int >::type k(kSEXP);
+    Rcpp::traits::input_parameter< double >::type shape(shapeSEXP);
+    rcpp_result_gen = Rcpp::wrap(rand_lkj(k, shape));
+    return rcpp_result_gen;
+END_RCPP
+}
+// combine_hypot
+List combine_hypot(const NumericMatrix& hypot, const LogicalMatrix& masks);
+RcppExport SEXP _evolqg_combine_hypot(SEXP hypotSEXP, SEXP masksSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const NumericMatrix& >::type hypot(hypotSEXP);
+    Rcpp::traits::input_parameter< const LogicalMatrix& >::type masks(masksSEXP);
+    rcpp_result_gen = Rcpp::wrap(combine_hypot(hypot, masks));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -42,6 +93,10 @@ END_RCPP
 static const R_CallMethodDef CallEntries[] = {
     {"_evolqg_RS", (DL_FUNC) &_evolqg_RS, 3},
     {"_evolqg_delta_z_corr", (DL_FUNC) &_evolqg_delta_z_corr, 4},
+    {"_evolqg_mantel_perm_cor", (DL_FUNC) &_evolqg_mantel_perm_cor, 5},
+    {"_evolqg_rand_corr_partial", (DL_FUNC) &_evolqg_rand_corr_partial, 2},
+    {"_evolqg_rand_lkj", (DL_FUNC) &_evolqg_rand_lkj, 2},
+    {"_evolqg_combine_hypot", (DL_FUNC) &_evolqg_combine_hypot, 2},
     {NULL, NULL, 0}
 };
 

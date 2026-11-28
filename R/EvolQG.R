@@ -6,10 +6,11 @@
 #' @aliases evolqg-package
 #' @docType package
 #' @import plyr
+#' @importFrom Rcpp evalCpp
 #' @importFrom graphics abline arrows axis layout mtext par plot text
 #' @importFrom grDevices rgb
 #' @importFrom methods is
-#' @importFrom stats anova confint cor cor.test cov cov2cor lm mahalanobis princomp quantile reorder residuals rnorm runif sd var
+#' @importFrom stats anova confint cor cor.test cov cov2cor dist lm mahalanobis princomp quantile rchisq reorder residuals rnorm runif sd var
 #' @importFrom utils write.csv write.table
 "_PACKAGE"
 

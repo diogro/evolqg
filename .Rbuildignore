@@ -1,8 +1,11 @@
-.git
-.gitignore
 ^.*\.Rproj$
 ^\.Rproj\.user$
-commit.adder.sh
-README.md
-.travis.yml
-^appveyor\.yml$
+^\.git$
+^\.gitignore$
+^\.github$
+^\.claude$
+^README\.md$
+^cran-comments\.md$
+^revdep$
+^\.DS_Store$
+^\.Rhistory$

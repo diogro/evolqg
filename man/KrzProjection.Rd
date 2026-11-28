@@ -32,9 +32,9 @@ If cov.x is a list, every element in cov.x is projected in cov.y.}
 
 \item{...}{additional arguments passed to other methods}
 
-\item{ret.dim.1}{number of retained dimensions for first matrix in comparison, default for nxn matrix is n/2-1}
+\item{ret.dim.1}{number of retained dimensions for first matrix in comparison, default for nxn matrix is n/2-1 (rounded, and at least 1)}
 
-\item{ret.dim.2}{number of retained dimensions for second matrix in comparison, default for nxn matrix is n/2-1}
+\item{ret.dim.2}{number of retained dimensions for second matrix in comparison, default for nxn matrix is n/2-1 (rounded, and at least 1)}
 
 \item{parallel}{if TRUE computations are done in parallel. Some foreach back-end must be registered, like doParallel or doMC.}
 
@@ -64,9 +64,9 @@ KrzProjection(m.list, c1)
 KrzProjection(m.list, c1, full.results = TRUE)
 }
 \dontrun{
-#Multiple threads can be used with some foreach backend library, like doMC or doParallel
-library(doMC)
-registerDoMC(cores = 2)
+#Multiple threads can be used with some foreach backend library, like doParallel or doMC
+library(doParallel)
+registerDoParallel(cores = 2)
 KrzProjection(m.list, parallel = TRUE)
 }
 }

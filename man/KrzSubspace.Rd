@@ -9,16 +9,17 @@ KrzSubspace(cov.matrices, k = NULL)
 \arguments{
 \item{cov.matrices}{list of covariance matrices}
 
-\item{k}{number of dimensions to be retained in calculating the subspace}
+\item{k}{number of dimensions to be retained in calculating the subspace.
+Must be between 1 and the number of traits. Default is \code{max(1, round(p/2 - 1))}, where p is the number of traits.}
 }
 \value{
 H shared space matrix
 
 k_eVals_H eigen values for shared space matrix, maximum value for each is the number of matrices, representing a fully shared direction
 
-k_eVecs_H eigen vectors of shared space matrix
+k_eVec_H eigen vectors of shared space matrix (a p x k matrix)
 
-angles between each population subspace and each eigen vector of shared space matrix
+k_angles data frame with the angles (in degrees) between each population subspace and each eigen vector of shared space matrix
 }
 \description{
 Calculates the subspace most similar across a set of covariance matrices.
@@ -45,9 +46,8 @@ avgH = Reduce("+", Hs)/length(Hs)
 avgH.vec <- eigen(avgH)$vectors
 MCMC.H.val = laply(Hs, function(mat) diag(t(avgH.vec) \%*\% mat \%*\% avgH.vec))
 
-# confidence intervals for variation in shared subspace directions
-library(coda)
-HPDinterval(as.mcmc(MCMC.H.val))    
+# 95\% intervals for variation in shared subspace directions
+apply(MCMC.H.val, 2, quantile, c(0.025, 0.975))
 }
 }
 \references{

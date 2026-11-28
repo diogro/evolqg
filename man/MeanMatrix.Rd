@@ -9,13 +9,24 @@ MeanMatrix(matrix.array, tol = 1e-10)
 \arguments{
 \item{matrix.array}{k x k x m array of covariance matrices, with k traits and m matrices}
 
-\item{tol}{minimum riemannian distance between sequential iterated means for accepting an estimated matrix}
+\item{tol}{relative tolerance for the stopping rule: iteration stops when the spectral norm of the
+mean of the log-mapped matrices (the Riemannian gradient) falls below \code{tol} times the Frobenius norm of the current mean}
 }
 \value{
 geometric mean covariance matrix
 }
 \description{
 Estimate geometric mean for a set of covariance matrices
+}
+\details{
+The mean is the Karcher (geometric, Riemannian) mean, computed by the Richardson-like
+iteration of Bini and Iannazzo (2013). For two matrices it is the exact geometric mean
+\eqn{A^{1/2}(A^{-1/2} B A^{-1/2})^{1/2} A^{1/2}}. A single matrix is returned as is.
+}
+\examples{
+matrices <- simplify2array(RandomMatrix(5, 10, 1, 3))
+MeanMatrix(matrices)
+
 }
 \references{
 Bini, D. A., Iannazzo, B. 2013. Computing the Karcher Mean of Symmetric

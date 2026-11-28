@@ -7,26 +7,52 @@
 CalculateMatrix(linear.m)
 }
 \arguments{
-\item{linear.m}{Linear model adjusted for original data.}
+\item{linear.m}{Linear model adjusted for original data, fitted with \code{lm()}.}
 }
 \value{
 Estimated covariance matrix.
 }
 \description{
-Calculates covariance matrix using the maximum likelihood estimator and the model residuals.
+Calculates the within-group (residual) covariance matrix of a multivariate linear model: the cross
+product of the model residuals divided by the residual degrees of freedom. This is the unbiased
+estimator, not the maximum likelihood estimator, which would divide by the number of observations.
+For a univariate model a 1 x 1 matrix is returned.
+}
+\details{
+Covariance matrices of a sample are usually wanted after removing the effect of known
+sources of variation, such as sex, population, age or size means, so that the matrix describes the
+variation around those fixed effects and not the differences between their levels. Fitting these
+effects with \code{lm()} (with a matrix of traits as response) and taking the covariance
+matrix of the residuals does exactly that.
+
+The estimator used is \code{crossprod(residuals(linear.m)) / linear.m$df.residual}. The residuals
+are not re-centered (a model without intercept is handled correctly), and the denominator is the
+residual degrees of freedom, \eqn{n - r}, with n observations and r the number of estimated
+coefficients (rank of the design matrix) for each trait: every estimated fixed effect uses up one
+degree of freedom, which makes the estimator unbiased. For an intercept-only model
+(\code{lm(y ~ 1)}) this is \eqn{n - 1}, and the result is the usual \code{cov(y)}.
+
+Use \code{cov2cor} on the result to obtain the corresponding correlation matrix. The residuals
+(and so the matrix) do not depend on the contrasts used for factors, as long as the model includes
+the same fixed effects.
+
+For more detailed models, the \pkg{stanimal} package (\url{https://github.com/diogro/stanimal}, not on
+CRAN; install with \code{pak::pkg_install("diogro/stanimal/package")}, it needs CmdStan through
+\pkg{cmdstanr}) has \code{stanimal::lm_phen_cov()}, which fits a fully Bayesian phenotypic covariance
+matrix after fixed effects in Stan, with an LKJ prior on the correlations (or a factor-structured
+covariance), missing trait values allowed, and posterior draws of P, corrP and the fixed effects.
+Use it when a full posterior, regularisation for many traits, or incomplete data matter.
+\code{stanimal::lm_phen_cov_laplace()} is a fast Laplace approximation of the same model, and
+\code{stanimal::lmm_animal()} estimates the additive genetic matrix G (and the residual E) from a
+pedigree or genomic relationship matrix, for when G and not P is the target.
 }
 \examples{
 data(iris)
-old <- options(contrasts=c("contr.sum","contr.poly"))
 iris.lm = lm(as.matrix(iris[,1:4])~iris[,5])
 cov.matrix <- CalculateMatrix(iris.lm)
-options(old)  
 
 #To obtain a corrlation matrix, use:
 cor.matrix <- cov2cor(cov.matrix)
-}
-\references{
-https://github.com/lem-usp/evolqg/wiki/
 }
 \author{
 Diogo Melo, Fabio Machado

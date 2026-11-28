@@ -10,7 +10,8 @@ BootstrapRep(
   iterations = 1000,
   sample.size = dim(ind.data)[1],
   correlation = FALSE,
-  parallel = FALSE
+  parallel = FALSE,
+  ...
 )
 }
 \arguments{
@@ -25,6 +26,8 @@ BootstrapRep(
 \item{correlation}{If TRUE, correlation matrix is used, else covariance matrix.}
 
 \item{parallel}{if TRUE computations are done in parallel. Some foreach backend must be registered, like doParallel or doMC.}
+
+\item{...}{Additional arguments passed to ComparisonFunc.}
 }
 \value{
 returns the mean repeatability, that is, the mean value of comparisons from samples to original statistic.
@@ -36,6 +39,12 @@ Calculates the repeatability of the covariance matrix of the supplied data
 \details{
 Samples with replacement are taken from the full population, a statistic calculated
   and compared to the full population statistic.
+
+Resamples are drawn in the main process, in the same order whether or not
+  \code{parallel = TRUE}, so the resampled populations (and the result, for deterministic
+  comparison functions) do not depend on the number of workers.
+  Resamples for which the comparison fails or returns NA are redrawn, up to 100 times per resample,
+  after which an error is raised; a single warning reports that redraws happened.
 }
 \examples{
 BootstrapRep(iris[,1:4], MantelCor, iterations = 5, correlation = TRUE)

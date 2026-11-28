@@ -4,7 +4,7 @@
 #' expanded in direct and indirect components by trait and compared via
 #' vector correlations.
 #' @param cov.x Covariance matrix being compared. cov.x can be a matrix or a list.
-#' @param cov.y Covariance matrix being compared. Ignored if cov.x is a list.
+#' @param cov.y Covariance matrix being compared. Ignored (with a warning) if cov.x is a list.
 #' @param iterations Number of random vectors used in comparison
 #' @param parallel if TRUE computations are done in parallel. Some foreach back-end must be registered, like doParallel or doMC.
 #' @param ... additional parameters passed to other methods
@@ -15,7 +15,8 @@
 #' deviations, centered means e centered standard deviations
 #' @return pc1 scored along the pc1 of the mean/SD correlation matrix
 #' @return model List of linear model results from mean/SD correlation. Quantiles, interval and divergent traits
-#' @note If input is a list, output is a symmetric list array with pairwise comparisons.
+#' @note If input is a list, output is a symmetric list array with pairwise comparisons. The list must have at least two matrices.
+#' With fewer than 40 iterations the 2.5\% and 97.5\% limits use the smallest and largest values.
 #' @export
 #' @rdname SRD
 #' @references Marroig, G., Melo, D., Porto, A., Sebastiao, H., and Garcia, G.
@@ -33,7 +34,7 @@
 #'
 #' #lists
 #' m.list <- RandomMatrix(10, 4)
-#' srd.array.result = SRD(m.list)
+#' srd.array.result = SRD(m.list, iterations = 100)
 #'
 #' #divergent traits
 #' colnames(cov.matrix.1)[as.logical(srd.output$model$code)]
@@ -46,9 +47,9 @@
 #' plot(srd.array.result[3,4][[1]])
 #'
 #' \dontrun{
-#' #Multiple threads can be used with some foreach backend library, like doMC or doParallel
-#' library(doMC)
-#' registerDoMC(cores = 2)
+#' #Multiple threads can be used with some foreach backend library, like doParallel
+#' library(doParallel)
+#' registerDoParallel(cores = 2)
 #' SRD(m.list, parallel = TRUE)
 #' }
 #' @keywords SRD
@@ -63,14 +64,12 @@ SRD <- function (cov.x, cov.y, ...) UseMethod("SRD")
 SRD.default <- function (cov.x, cov.y, iterations = 1000, ...) {
   size <- dim (cov.x)[1]
   if(iterations < 2*size) stop("Iterations must be larger than twice the number of traits.")
-  r2s <- array (0, c(size,iterations))
   beta <- apply (array (rnorm (size*iterations, mean = 0, sd = 1), c(size,iterations)), 2, Normalize)
-  for (I in 1:iterations){
-    beta.matrix <- diag (beta[,I])
-    dz1 <- apply (cov.x %*% beta.matrix, 1, Normalize)
-    dz2 <- apply (cov.y %*% beta.matrix, 1, Normalize)
-    r2s[,I] <- colSums (dz1 * dz2)
-  }
+  # For each trait (row) and random vector, the correlation between the
+  # normalised rows of cov.x %*% diag(beta) and cov.y %*% diag(beta)
+  B2 <- beta^2
+  r2s <- ((cov.x * cov.y) %*% B2) / sqrt(((cov.x^2) %*% B2) * ((cov.y^2) %*% B2))
+  r2s <- unname (r2s)
   # results
   mean.r2 <- apply (r2s, 1, mean)
   sample.conf <- function (x, lower = TRUE){
@@ -80,7 +79,7 @@ SRD.default <- function (cov.x, cov.y, iterations = 1000, ...) {
       crit <- round (0.025 * lox)
     else
       crit <- round (0.975 * lox)
-    return (ox[crit])
+    return (ox[max (1, crit)])
   }
   low.r2 <- apply (r2s, 1, sample.conf, lower = TRUE)
   up.r2 <- apply (r2s, 1, sample.conf, lower = FALSE)
@@ -116,16 +115,21 @@ SRD.default <- function (cov.x, cov.y, iterations = 1000, ...) {
 #' @method SRD list
 #' @export
 SRD.list <- function (cov.x, cov.y = NULL, iterations = 1000, parallel = FALSE, ...){
+  if (!is.null(cov.y))
+    warning("cov.y is ignored when cov.x is a list.")
   n.matrix <- length(cov.x)
-  if(is.null(names(cov.x))) {names(cov.x) <- 1:n.matrix}
-  matrix.names <- names (cov.x)
-  CompareToN <- function(n) llply(cov.x[(n+1):n.matrix],
-                                  function(x) {SRD(x, cov.x[[n]], iterations = iterations)},
-                                  .parallel = parallel)
-  comparisons <- alply(1:(n.matrix-1), 1,  CompareToN, .parallel = parallel)
+  if (n.matrix < 2)
+    stop("cov.x must contain at least two matrices to be compared.")
+  if(is.null(names(cov.x))) {names(cov.x) <- seq_len(n.matrix)}
+  pairs <- t (utils::combn (n.matrix, 2))
+  pairs <- pairs[order (pairs[, 1], pairs[, 2]), , drop = FALSE]
+  comparisons <- .evq_lapply (seq_len (nrow (pairs)),
+                              function(l) SRD (cov.x[[pairs[l, 2]]], cov.x[[pairs[l, 1]]],
+                                               iterations = iterations),
+                              parallel = parallel)
   corrs <- array(list(), c(n.matrix, n.matrix))
-  for(i in 1:(n.matrix-1)){
-    corrs[i,(i+1):n.matrix] <- comparisons[[i]]
+  for(l in seq_len (nrow (pairs))){
+    corrs[[pairs[l, 1], pairs[l, 2]]] <- comparisons[[l]]
   }
   corrs[lower.tri(corrs)] <- t(corrs)[lower.tri(corrs)]
   colnames(corrs) <- rownames(corrs) <- names(cov.x)
@@ -147,7 +151,7 @@ plot.SRD <- function (x, matrix.label = "", ...) {
   c.mean.r2 <- output$output[,5]
   c.sd.r2 <- output$output[,6]
   if (is.null (rownames (output$output)))
-    dists <- 1:length (mean.r2)
+    dists <- seq_along (mean.r2)
   else
     dists <- rownames (output$output)
   ### plot scores
@@ -155,15 +159,15 @@ plot.SRD <- function (x, matrix.label = "", ...) {
   pc.pch <- output$model$code + 20
   plot (mean.r2, type = "p", lty = 2, pch = pc.pch,
         ylab = "", xlab = "", xaxt = "n", ylim = c(-1,1), ...)
-  for (i in 1:length (mean.r2))
+  for (i in seq_along (mean.r2))
   {
     abline (v = i, lty = 1, col = rgb (0.8,0.8,0.8))
   }
-  arrows (x0 = 1:length (mean.r2),
+  arrows (x0 = seq_along (mean.r2),
           y0 = low.r2, y1 = up.r2,
           angle = 90, length = 0.05, code = 3)
   abline (h = mean (mean.r2), lty = 3)
-  axis (3, 1:length (mean.r2), dists, las = 2, cex.axis = 1.3)
+  axis (3, seq_along (mean.r2), dists, las = 2, cex.axis = 1.3)
   mtext (side = 2, at = mean (mean.r2), text = round (mean (mean.r2), 2), las = 2, cex=1.8)
   ### plot av sd
   ### b l t r

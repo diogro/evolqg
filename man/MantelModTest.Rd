@@ -15,7 +15,8 @@ MantelModTest(cor.hypothesis, cor.matrix, ...)
   MHI = FALSE,
   ...,
   landmark.dim = NULL,
-  withinLandmark = FALSE
+  withinLandmark = FALSE,
+  perm.matrix = NULL
 )
 
 \method{MantelModTest}{list}(
@@ -44,6 +45,8 @@ MantelModTest(cor.hypothesis, cor.matrix, ...)
 
 \item{withinLandmark}{Logical. If TRUE within-landmark correlation are used in calculation of correlation. Only used if landmark.dim is passed, default is FALSE.}
 
+\item{perm.matrix}{Optional matrix of permutations (one per row, as built internally for the list method) used for the Mantel test instead of drawing new ones. Ignored if \code{landmark.dim} is given.}
+
 \item{parallel}{if TRUE computations are done in parallel. Some foreach back-end must be registered, like doParallel or doMC.}
 }
 \value{
@@ -56,6 +59,8 @@ This function is usually only called by TestModularity.
 }
 \details{
 CalcAVG can be used when a significance test is not required.
+
+The list method uses the same set of permutations for every hypothesis (except when \code{landmark.dim} is given, where \code{\link{MantelCor}} is called for each one). Hypotheses with no within-module pairs (all-zero, or modules with a single trait) or with all trait pairs within modules give an undefined correlation, and a warning is issued.
 }
 \examples{
 # Create a single modularity hypothesis:
@@ -82,7 +87,7 @@ Porto, Arthur, Felipe B. Oliveira, Leila T. Shirai, Valderes Conto, and Gabriel 
 Modularity and Morphometrics: Error Rates in Hypothesis Testing Guilherme Garcia, Felipe Bandoni de Oliveira, Gabriel Marroig bioRxiv 030874; doi: http://dx.doi.org/10.1101/030874
 }
 \seealso{
-\code{\link[vegan]{mantel}},\code{\link{MantelCor}},\code{\link{CalcAVG}},\code{\link{TestModularity}}
+\code{\link{MantelCor}},\code{\link{CalcAVG}},\code{\link{TestModularity}}
 }
 \author{
 Diogo Melo, Guilherme Garcia

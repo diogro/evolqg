@@ -9,7 +9,7 @@ BayesianCalculateMatrix(linear.m, samples = NULL, ..., nu = NULL, S_0 = NULL)
 \arguments{
 \item{linear.m}{Linear model adjusted for original data}
 
-\item{samples}{number os samples to be generated from the posterior. Requires sample size to be at least as large as the number of dimensions}
+\item{samples}{number of samples to be generated from the posterior. See Details for the sample size needed}
 
 \item{...}{additional arguments, currently ignored}
 
@@ -21,9 +21,53 @@ BayesianCalculateMatrix(linear.m, samples = NULL, ..., nu = NULL, S_0 = NULL)
 Estimated covariance matrices and posterior samples
 }
 \description{
-Calculates covariance matrix using the maximum likelihood estimator, the maximum a posteriori (MAP)
-estimator under a regularized Wishart prior, and if the sample is large enough can give samples from the 
-posterior and the median posterior estimator.
+Calculates the residual covariance matrix of a multivariate linear model with a regularized
+(shrinkage) Wishart prior, and, if requested, samples from the resulting posterior distribution
+and their element-wise median.
+}
+\details{
+Let \eqn{S_x} be the cross product of the residuals of the model (\code{crossprod(residuals)}),
+\eqn{N} the residual degrees of freedom (as in \code{\link{CalculateMatrix}}) and p the number of traits.
+The prior on the covariance matrix is an inverse Wishart with \eqn{\nu} degrees of freedom (\code{nu})
+and scale matrix \eqn{S_0} (\code{S_0}). By default \eqn{\nu = p} and \eqn{S_0} is a diagonal matrix with
+the observed variances times \eqn{\nu} on the diagonal and zero covariances, so the prior pulls the
+covariances towards zero and keeps the variances at their observed values. A large \code{nu}
+is a strong prior, and with the default \eqn{\nu = p} the prior carries as much weight as p extra observations,
+which can be too strong for small samples.
+\itemize{
+ \item \code{MLE} is \eqn{S_x / N}, the residual cross product divided by the residual degrees of
+ freedom. Despite the name this is not the maximum likelihood estimator (which would divide by the
+ number of observations): it is the unbiased estimator, equal to \code{\link{CalculateMatrix}}.
+ \item \code{MAP} is \eqn{(S_0 + S_x) / (\nu + N)}, the sample estimate shrunk towards the prior, a
+ weighted average of the prior scale and the \code{MLE}. It is the estimate to use when the sample
+ is small. Note that this is not the mode of the posterior distribution that is sampled
+ below, which for k traits is \eqn{(S_0 + S_x) / (\nu + N + k + 1)}.
+ \item \code{Ps} (only when \code{samples} is given) are \code{samples} draws from the posterior
+ distribution, which is an inverse Wishart with \eqn{\nu + N} degrees of freedom and scale
+ \eqn{S_0 + S_x}, returned as a samples x p x p array. The draws are independent and use the random
+ number stream, so set a seed for reproducibility. They can be used to propagate the uncertainty of
+ the matrix estimate to any downstream statistic (for example, one eigentensor decomposition
+ per sample).
+ \item \code{P} (only when \code{samples} is given) is the element-wise median of the posterior
+ samples, a point estimate of the matrix.
+}
+Sampling from the posterior needs \eqn{\nu + N \geq p} (an error otherwise), and a
+non-singular \eqn{S_0 + S_x}. With the default prior (\eqn{\nu = p}, diagonal \eqn{S_0}) the first holds
+always and the second holds whenever every trait has some variance, so "large enough" only matters
+for the quality of the estimates: with fewer observations than traits \eqn{S_x} is singular and the
+posterior is dominated by the prior. With a custom, low-rank \code{S_0} or a small \code{nu}, a sample
+at least as large as the number of traits is needed. \code{MAP} and \code{MLE} are always computed.
+
+For more detailed models, the \pkg{stanimal} package (\url{https://github.com/diogro/stanimal}, not on
+CRAN; install with \code{pak::pkg_install("diogro/stanimal/package")}, it needs CmdStan through
+\pkg{cmdstanr}) has \code{stanimal::lm_phen_cov()}, a fully Bayesian phenotypic covariance matrix
+after fixed effects, fitted in Stan with an LKJ prior on the correlations (or a factor-structured
+covariance), missing trait values allowed, and posterior draws of P, corrP and the fixed effects.
+By contrast, the posterior here is the conjugate inverse Wishart for the residual covariance: quick,
+but with a less flexible prior. Use \code{stanimal::lm_phen_cov()} when a full posterior, regularisation
+for many traits, or incomplete data matter; \code{stanimal::lm_phen_cov_laplace()} is a fast Laplace
+approximation of the same model, and \code{stanimal::lmm_animal()} estimates the additive genetic matrix
+G (and the residual E) from a pedigree or genomic relationship matrix, for when G is the target.
 }
 \examples{
 data(iris)

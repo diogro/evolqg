@@ -25,7 +25,7 @@ test_that("RSProjection returns correct results",
               #setting up an index for HPD comparisons
               proj.score <-matrix(,vec,((m^2 - m)/2))
               for (k in 1:vec){
-                HPD.int <- HPDinterval(as.mcmc(G.proj[,,k]), prob = p)
+                HPD.int <- .hpd_interval(G.proj[,,k], prob = p)
                 proj.score[k,] <- ifelse(HPD.int[prs.comp[,1],1] > HPD.int[prs.comp[,2],2] | HPD.int[prs.comp[,2],1] > HPD.int[prs.comp[,1],2],1,0) 
               }
               #for a given random vector, examine if the HPD intervals of any pair of G matrices overlap
@@ -49,15 +49,40 @@ test_that("RSProjection returns correct results",
                                  variance = runif(6, 1, 10)), 
                     identity)), 
               c(3, 4, 1, 2))
-            suppressWarnings(RNGversion("3.5.0"))
-            set.seed(42)
+            local_seed(42, "3.5.0")
             rs_proj = RSProjection(cov.matrices, p = 0.8)  
-            suppressWarnings(RNGversion("3.5.0"))
-            set.seed(42)
+            local_seed(42, "3.5.0")
             rs_proj_bench = rs_benchmark_aguirre(cov.matrices, p = 0.8) 
-            expect_that(rs_proj, is_equivalent_to(rs_proj_bench))
+            expect_equal(rs_proj, rs_proj_bench, ignore_attr = TRUE)
             }
 )
-  
-            
-            
+
+small_array <- function(m, samples = 20, p = 4) {
+  out <- aperm(aaply(seq_len(m), 1, function(x)
+    laply(RandomMatrix(p, samples, variance = runif(p, 1, 10)), identity)), c(3, 4, 1, 2))
+  dimnames(out)[[3]] <- paste0("pop", seq_len(m))
+  out
+}
+
+test_that("RSProjection works with two populations", {
+  local_seed(7)
+  arr <- small_array(2)
+  rs <- RSProjection(arr, p = 0.8, num.vectors = 50)
+  expect_s3_class(rs, "rs_proj")
+  expect_equal(dim(rs$vec.score), c(50, 4 + 1))
+  expect_equal(colnames(rs$vec.score)[5], "pop1.vs.pop2")
+  expect_equal(dim(rs$cov.projection), c(20, 2, 50))
+  expect_error(RSProjection(arr[, , 1, , drop = FALSE]), "two populations")
+})
+
+test_that("RSProjection and PlotRSprojection work with several populations", {
+  local_seed(8)
+  arr <- small_array(3)
+  rs <- RSProjection(arr, p = 0.8, num.vectors = 100)
+  plt <- PlotRSprojection(rs, arr, p = 0.8, ncols = 2)
+  expect_s3_class(plt, "ggplot")
+  expect_equal(names(plt$data), c("Population", "trait", "lower", "upper", "mean"))
+  expect_equal(nrow(plt$data), 3 * 4)
+  expect_true(all(plt$data$lower <= plt$data$upper))
+  expect_no_error(ggplot2::ggplot_build(plt))
+})

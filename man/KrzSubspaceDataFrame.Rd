@@ -14,10 +14,10 @@ KrzSubspaceDataFrame(x, n = ncol(observed), prob = 0.95)
 \item{prob}{Posterior probability interval. Default is 95\%.}
 }
 \value{
-Posterior intervals for the eigenvalues of the H matrix in the KrzSubspace comparison.
+Data frame with the posterior HPD interval (\code{lower}, \code{upper}) for the eigenvalues of the H matrix in the KrzSubspace comparison, for the observed and random (null) distributions. The \code{mean} column is the midpoint of the HPD interval, not the posterior mean.
 }
 \description{
-Returns posterior means and confidence intervals from the object produced by the KrzSubspaceBootstrap() function. Mainly used for ploting using PlotKrzSubspace. 
+Returns the HPD intervals and their midpoints from the object produced by the KrzSubspaceBootstrap() function. Mainly used for ploting using PlotKrzSubspace. 
 See example in the KrzSubspaceBootstrap function.
 }
 \seealso{

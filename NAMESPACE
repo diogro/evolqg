@@ -110,38 +110,19 @@ export(TPS)
 export(TestModularity)
 export(TreeDriftTest)
 import(plyr)
-importFrom(MCMCpack,riwish)
 importFrom(Matrix,
-  Matrix,
-  Schur,
   bdiag,
-  chol,
-  diag,
-  nearPD,
-  solve
+  nearPD
 )
-importFrom(Morpho,
-  ProcGPA,
-  arrMean3,
-  cSize
-)
+importFrom(Rcpp,evalCpp)
 importFrom(ape,
   cophenetic.phylo,
   nodelabels,
   reorder.phylo
 )
-importFrom(coda,
-  HPDinterval,
-  as.mcmc
-)
-importFrom(expm,
-  expm,
-  logm,
-  sqrtm
-)
 importFrom(ggplot2,
+  .data,
   aes,
-  aes_string,
   element_text,
   facet_wrap,
   geom_boxplot,
@@ -152,7 +133,6 @@ importFrom(ggplot2,
   geom_text,
   ggplot,
   labs,
-  layer,
   position_dodge,
   scale_x_continuous,
   scale_y_continuous,
@@ -172,34 +152,15 @@ importFrom(graphics,
   plot,
   text
 )
-importFrom(igraph,
-  graph.adjacency,
-  optimal.community
-)
 importFrom(methods,is)
-importFrom(mvtnorm,
-  dmvnorm,
-  rmvnorm
-)
-importFrom(numDeriv,jacobian)
-importFrom(plyr,
-  aaply,
-  alply,
-  laply
-)
-importFrom(reshape2,
-  acast,
-  dcast,
-  melt
-)
 importFrom(stats,
   anova,
-  as.formula,
   confint,
   cor,
   cor.test,
   cov,
   cov2cor,
+  dist,
   lm,
   mahalanobis,
   median,
@@ -207,6 +168,7 @@ importFrom(stats,
   princomp,
   quantile,
   rbeta,
+  rchisq,
   reorder,
   residuals,
   rnorm,
@@ -219,5 +181,4 @@ importFrom(utils,
   write.csv,
   write.table
 )
-importFrom(vegan,mantel)
-useDynLib(evolqg)
+useDynLib(evolqg, .registration = TRUE)

@@ -1,13 +1,17 @@
-# History files
+# R session files
 .Rhistory
-# Example code in package build process
-*-Ex.R
-Morphometrics.Rcheck/*
+.RData
 .Rproj.user
 *.Rproj
-Morphometrics.Rproj
+# Build and check output
+*-Ex.R
+*.Rcheck/
+*.tar.gz
 src/*.o
 src/*.so
+src/*.dll
+revdep/
+# Misc
 *.Rdata
-*.dll
 .DS_Store
+.claude/

@@ -30,7 +30,11 @@ RandomMatrix(
 
 \item{LKJ}{logical. Use LKJ distribution for generating correlation matrices.}
 
-\item{shape}{Shape parameter for the LKJ distribution. Values closer to zero leads to a more uniform distribution correlations. Higher values lead to correlations closer to zero.}
+\item{shape}{The LKJ parameter eta, positive. With \code{shape = 1} the correlation matrices are
+uniformly distributed over all correlation matrices; larger values concentrate the distribution
+around the identity matrix (correlations closer to zero), and values below 1 favour strong correlations.
+The marginal distribution of each correlation is a Beta(shape - 1 + n/2, shape - 1 + n/2)
+rescaled to (-1, 1), for n traits.}
 }
 \value{
 Returns either a single matrix, or a list of matrices of equal dimension

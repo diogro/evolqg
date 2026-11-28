@@ -12,8 +12,8 @@
 #' @param ... additional arguments passed to other methods
 #' @param cov.y First argument is compared to cov.y.
 #' If cov.x is a list, every element in cov.x is projected in cov.y.
-#' @param ret.dim.1 number of retained dimensions for first matrix in comparison, default for nxn matrix is n/2-1
-#' @param ret.dim.2 number of retained dimensions for second matrix in comparison, default for nxn matrix is n/2-1
+#' @param ret.dim.1 number of retained dimensions for first matrix in comparison, default for nxn matrix is n/2-1 (rounded, and at least 1)
+#' @param ret.dim.2 number of retained dimensions for second matrix in comparison, default for nxn matrix is n/2-1 (rounded, and at least 1)
 #' @param parallel if TRUE computations are done in parallel. Some foreach back-end must be registered, like doParallel or doMC.
 #' @param full.results if FALSE returns only total variance, if TRUE also per PC variance.
 #' @return Ratio of projected variance to total variance, and ratio of projected total in each PC
@@ -24,8 +24,6 @@
 #' @seealso \code{\link{RandomSkewers}},\code{\link{MantelCor}}
 #' @rdname KrzProjection
 #' @export
-#' @import plyr
-#' @importFrom reshape2 melt
 #' @examples
 #' c1 <- RandomMatrix(10)
 #' c2 <- RandomMatrix(10)
@@ -42,9 +40,9 @@
 #' KrzProjection(m.list, c1, full.results = TRUE)
 #' }
 #' \dontrun{
-#' #Multiple threads can be used with some foreach backend library, like doMC or doParallel
-#' library(doMC)
-#' registerDoMC(cores = 2)
+#' #Multiple threads can be used with some foreach backend library, like doParallel or doMC
+#' library(doParallel)
+#' registerDoParallel(cores = 2)
 #' KrzProjection(m.list, parallel = TRUE)
 #' }
 #' @keywords matrixcomparison
@@ -59,20 +57,24 @@ KrzProjection <- function(cov.x, cov.y, ...) UseMethod("KrzProjection")
 KrzProjection.default <- function (cov.x, cov.y, ret.dim.1 = NULL, ret.dim.2 = NULL, ...) {
   num.traits <- dim(cov.x)[1]
   if (is.null(ret.dim.1))
-    ret.dim.1 <- round(num.traits/2 - 1)
+    ret.dim.1 <- .default_ret_dim(num.traits)
   if (is.null(ret.dim.2))
-    ret.dim.2 <- round(num.traits/2 - 1)
-  eigen.cov.x <- eigen(cov.x)
-  eVal.1 <- eigen.cov.x$values
-  eVec.1 <- eigen.cov.x$vectors
-  eVar.1 <- t(aaply(1:num.traits, 1, function(n) eVec.1[,n]*sqrt(eVal.1[n])))
-  eVec.2 <- eigen(cov.y)$vectors
-  SumSq  <- function(x) sum(x^2)
-  MapProjection  <- function(x) SumSq(t(aaply(1:ret.dim.2, 1, function(n) eVar.1[,x]%*%eVec.2[,n])))
-  ProjectionNorms <- aaply(1:ret.dim.1, 1, MapProjection)
-  output <- list(total.variation = sum(ProjectionNorms)/sum(eVal.1),
-                 per.PC = ProjectionNorms/eVal.1[1:ret.dim.1])
-  return (output)
+    ret.dim.2 <- .default_ret_dim(num.traits)
+  .krz_projection(eigen(cov.x, symmetric = TRUE), eigen(cov.y, symmetric = TRUE),
+                  ret.dim.1, ret.dim.2)
+}
+
+# Projection of the variance in the first ret.dim.1 PCs of the first matrix onto
+# the first ret.dim.2 PCs of the second one, from their eigen decompositions.
+.krz_projection <- function(eigen.1, eigen.2, ret.dim.1, ret.dim.2) {
+  keep.1 <- seq_len(ret.dim.1)
+  eVal.1 <- eigen.1$values
+  eVar.1 <- sweep(eigen.1$vectors[, keep.1, drop = FALSE], 2, sqrt(eVal.1[keep.1]), "*")
+  ProjectionNorms <- colSums(crossprod(eigen.2$vectors[, seq_len(ret.dim.2), drop = FALSE],
+                                       eVar.1)^2)
+  names(ProjectionNorms) <- keep.1
+  list(total.variation = sum(ProjectionNorms)/sum(eVal.1),
+       per.PC = ProjectionNorms/eVal.1[keep.1])
 }
 
 #' @rdname KrzProjection
@@ -81,41 +83,44 @@ KrzProjection.default <- function (cov.x, cov.y, ret.dim.1 = NULL, ret.dim.2 = N
 KrzProjection.list <- function(cov.x, cov.y = NULL,
                                ret.dim.1 = NULL, ret.dim.2 = NULL,
                                parallel = FALSE, full.results = FALSE, ...){
+  n.matrix <- length(cov.x)
+  if (n.matrix < 1) stop("cov.x must contain at least one matrix")
+  dims <- function(m) {
+    n <- nrow(m)
+    c(if (is.null(ret.dim.1)) .default_ret_dim(n) else ret.dim.1,
+      if (is.null(ret.dim.2)) .default_ret_dim(n) else ret.dim.2)
+  }
+  # one eigen decomposition per matrix
+  eigen.x <- lapply(cov.x, eigen, symmetric = TRUE)
   if(is.null(cov.y)){
-    if(full.results){
-      CompareToNProj <- function(n) llply(cov.x,
-                                          function(x) {KrzProjection(x,
-                                                                     cov.x[[n]],
-                                                                     ret.dim.1, ret.dim.2)},
-                                          .parallel = parallel)
-    } else{
-      CompareToNProj <- function(n) llply(cov.x,
-                                          function(x) {KrzProjection(x,
-                                                                     cov.x[[n]],
-                                                                     ret.dim.1, ret.dim.2)[1]},
-                                          .parallel = parallel)
+    matrix.names <- .fix_names(names(cov.x), n.matrix)
+    names(eigen.x) <- matrix.names
+    # only the outer loop (one reference matrix at a time) is parallel
+    CompareToNProj <- function(n) {
+      k <- dims(cov.x[[n]])
+      res <- lapply(eigen.x, function(x) .krz_projection(x, eigen.x[[n]], k[1], k[2]))
+      if (full.results) res else vapply(res, function(r) r$total.variation, numeric(1))
     }
-    if(is.null(names(cov.x))) {names(cov.x) <- 1:length(cov.x)}
-    comparisons.proj <- llply(names(cov.x),
-                              CompareToNProj,
-                              .parallel = parallel)
+    comparisons.proj <- .evq_lapply(seq_len(n.matrix), CompareToNProj, parallel = parallel)
     if(full.results){
-      names(comparisons.proj) = names(cov.x)
+      names(comparisons.proj) <- matrix.names
+      return(comparisons.proj)
+    }
+    # rows are the projected matrices, columns the matrices projected onto
+    out <- do.call(cbind, comparisons.proj)
+    dimnames(out) <- list(matrix.names, matrix.names)
+    return(out)
+  } else{
+    .check_same_dim(cov.x, cov.y)
+    eigen.y <- eigen(cov.y, symmetric = TRUE)
+    k <- dims(cov.y)
+    comparisons.proj <- .evq_lapply(eigen.x, function(x) .krz_projection(x, eigen.y, k[1], k[2]),
+                                    parallel = parallel)
+    if(full.results){
       return(comparisons.proj)
     } else{
-      comparisons.proj <- melt(comparisons.proj)
-      comparisons.proj[,4] = names(cov.x)[(comparisons.proj[,4])]
-      comparisons.proj = comparisons.proj[,-2]
-      comparisons.proj = acast(comparisons.proj, L2~L1)[names(cov.x), names(cov.x)]
+      return(data.frame(V1 = vapply(comparisons.proj, function(r) r$total.variation, numeric(1)),
+                        row.names = NULL))
     }
-    return(comparisons.proj)
-  } else{
-    if(full.results){
-      comparisons.proj <- llply(cov.x, function(x) {KrzProjection(x, cov.y, ret.dim.1, ret.dim.2)}, .parallel = parallel)
-    } else{
-      comparisons.proj <- laply(cov.x, function(x) {KrzProjection(x, cov.y, ret.dim.1, ret.dim.2)[1]}, .parallel = parallel)
-      comparisons.proj <- ldply(comparisons.proj)
-    }
-    return(comparisons.proj)
   }
 }

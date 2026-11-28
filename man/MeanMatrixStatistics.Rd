@@ -58,14 +58,19 @@ mean Mean value for all statistics
 \description{
 Calculates: Mean Squared Correlation, ICV, Autonomy, ConditionalEvolvability, Constraints, Evolvability, Flexibility, Pc1Percent, Respondability.
 }
+\details{
+Autonomy and ConditionalEvolvability need the inverse of the covariance matrix. If the
+matrix is not positive definite (or is numerically singular) a warning is issued and the nearest
+positive definite matrix (\code{Matrix::nearPD}) is used instead, so the results are approximate.
+}
 \examples{
 cov.matrix <- cov(iris[,1:4])
 MeanMatrixStatistics(cov.matrix)
 
 \dontrun{
-#Multiple threads can be used with some foreach backend library, like doMC or doParallel
-library(doMC)
-registerDoMC(cores = 2)
+#Multiple threads can be used with some foreach backend library, like doParallel
+library(doParallel)
+registerDoParallel(cores = 2)
 MeanMatrixStatistics(cov.matrix, parallel = TRUE)
 }
 }

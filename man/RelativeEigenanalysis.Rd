@@ -14,10 +14,19 @@ RelativeEigenanalysis(cov.x, cov.y, symmetric = FALSE)
 \item{symmetric}{Logical. If TRUE, computes symmetric eigenanalysis.}
 }
 \value{
-list with two objects: eigenvalues and eigenvectors
+an object of class \code{eigen} (a list with \code{values} and \code{vectors}).
+The values are always real, and ordered decreasingly.
 }
 \description{
 Computes relative eigenvalues and eigenvectors between a pair of covariance matrices.
+}
+\details{
+With \code{symmetric = FALSE} the eigenvalues and eigenvectors of \code{cov.x \%*\% solve(cov.y)}
+are returned; the eigenvectors are scaled to unit length. The computation uses a Cholesky whitening of
+\code{cov.y} and symmetric eigenanalysis, so the eigenvalues are real and numerically stable, even for
+many traits (the direct eigenanalysis of the non-symmetric product can return complex values).
+With \code{symmetric = TRUE} the eigenanalysis is of \code{cov.y^(-1/2) \%*\% cov.x \%*\% cov.y^(-1/2)},
+with unit-length eigenvectors in the whitened space. The sign of each eigenvector is arbitrary.
 }
 \examples{
 data(dentus)

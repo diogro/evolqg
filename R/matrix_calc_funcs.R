@@ -35,7 +35,7 @@ maximum.norm <- function (x) {
   }
   else {
     if (is.vector(x)) {
-      X.mat <- x
+      Xmat <- matrix(x, nrow = length(x), ncol = 1)
     }
     else {
       stop("argument is neither a matrix nor a vector")
@@ -46,7 +46,8 @@ maximum.norm <- function (x) {
 }
 
 frobenius.prod <- function (x, y){
-  return(sum(hadamard.prod(x, y)))
+  if (length(x) != length(y)) stop("arguments x and y do not have the same size")
+  return(sum(x * y))
 }
 
 hadamard.prod <- function (x, y) 

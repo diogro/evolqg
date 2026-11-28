@@ -20,7 +20,8 @@ k traits (obtained from \code{\link{EigenTensorDecomposition}})}
 deviations for each eigentensor? Defaults to TRUE}
 }
 \value{
-A symmetric covariance matrix with k traits
+A symmetric covariance matrix with k traits. It is the exact inverse of \code{\link{ProjectMatrix}}:
+\code{ProjectMatrix(RevertMatrix(scores, etd, scaled = FALSE), etd)} returns \code{scores}.
 }
 \description{
 Constructs a covariance matrix based on scores over covariance matrix eigentensors.

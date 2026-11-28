@@ -10,12 +10,15 @@ Center2MeanJacobianFast(jacobArray)
 \item{jacobArray}{Arrays of Jacobian calculated in the JacobianArray function}
 }
 \value{
-array of centered residual jacobians
+vector of centered log determinants of the jacobians, with mean zero
 }
 \description{
-Calculates mean jacobian matrix for a set of jacobian matrices
+Centers the log determinants of a set of jacobian matrices
 describing a local aspect of shape deformation for a given set of volumes,
-returning log determinants of deviations from mean jacobian (Woods, 2003).
+returning log determinants of deviations from the mean jacobian (Woods, 2003).
+The mean of the log determinants is the log determinant of the Karcher
+(log-Euclidean) mean jacobian, so the result is
+\code{logdet(J_i) - mean(logdet(J))}.
 }
 \references{
 Woods, Roger P. 2003. “Characterizing Volume and Surface

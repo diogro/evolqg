@@ -10,7 +10,7 @@ RSProjection(cov.matrix.array, p = 0.95, num.vectors = 1000)
 PlotRSprojection(rs_proj, cov.matrix.array, p = 0.95, ncols = 5)
 }
 \arguments{
-\item{cov.matrix.array}{Array with dimensions traits x traits x populations x MCMCsamples}
+\item{cov.matrix.array}{Array with dimensions traits x traits x populations x MCMCsamples. At least two populations are needed.}
 
 \item{p}{significance threshold for comparison of variation in each random direction}
 
@@ -39,7 +39,7 @@ cov.matrices = dlply(dentus, .(species), function(x) lm(as.matrix(x[,1:4])~1)) |
 cov.matrices = aperm(cov.matrices, c(3, 4, 1, 2))
 \donttest{
 rs_proj = RSProjection(cov.matrices, p = 0.8)
-PlotRSprojection(rs_proj, cov.matrices, ncol = 5)
+PlotRSprojection(rs_proj, cov.matrices, ncols = 5)
 }
 
 }

@@ -21,7 +21,7 @@
 CalcICV <- function (cov.matrix){
   .Deprecated("CalcEigenVar", package=NULL, "CalcICV is deprecated. CalcEigenVar is strongly preferred and should be used instead.")
   if(!isSymmetric(cov.matrix)) stop("covariance matrix must be symmetric.")
-  if(sum(diag(cov.matrix)) == dim(cov.matrix)[1]) warning("Matrix appears to be a correlation matrix! Only covariance matrices should be used for ICV.")
+  if(.is_cor_matrix(cov.matrix)) warning("Matrix appears to be a correlation matrix! Only covariance matrices should be used for ICV.")
   eVals <- eigen(cov.matrix, only.values = TRUE)$values
   ICV <- sd(eVals)/mean(eVals)
   return (ICV)
