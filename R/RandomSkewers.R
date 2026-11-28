@@ -25,7 +25,7 @@
 #' If repeat.vector is passed, comparison matrix is corrected above
 #' diagonal and repeatabilities returned in diagonal.
 #' @export
-#' @useDynLib evolqg
+#' @useDynLib evolqg, .registration = TRUE
 #' @rdname RandomSkewers
 #' @references Cheverud, J. M., and Marroig, G. (2007). Comparing covariance matrices:
 #' Random skewers method compared to the common principal components model.

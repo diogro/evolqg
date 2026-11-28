@@ -15,7 +15,7 @@
 #' @param ... additional arguments passed to other methods.
 #' @return vector of vector correlations between the expected responses for the two matrices for each supplied vector
 #' @export
-#' @useDynLib evolqg
+#' @useDynLib evolqg, .registration = TRUE
 #' @rdname DeltaZCorr
 #' @references Cheverud, J. M., and Marroig, G. (2007). Comparing covariance matrices:
 #' Random skewers method compared to the common principal components model.

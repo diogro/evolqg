@@ -125,6 +125,7 @@ importFrom(Morpho,
   arrMean3,
   cSize
 )
+importFrom(Rcpp,evalCpp)
 importFrom(ape,
   cophenetic.phylo,
   nodelabels,
@@ -220,4 +221,4 @@ importFrom(utils,
   write.table
 )
 importFrom(vegan,mantel)
-useDynLib(evolqg)
+useDynLib(evolqg, .registration = TRUE)

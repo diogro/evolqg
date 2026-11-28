@@ -6,6 +6,7 @@
 #' @aliases evolqg-package
 #' @docType package
 #' @import plyr
+#' @importFrom Rcpp evalCpp
 #' @importFrom graphics abline arrows axis layout mtext par plot text
 #' @importFrom grDevices rgb
 #' @importFrom methods is
