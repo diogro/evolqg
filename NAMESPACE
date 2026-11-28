@@ -157,7 +157,6 @@ importFrom(mvtnorm,
   dmvnorm,
   rmvnorm
 )
-importFrom(numDeriv,jacobian)
 importFrom(reshape2,
   acast,
   melt

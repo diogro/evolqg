@@ -122,7 +122,6 @@ Rotate2MidlineMatrix <- function (X, midline)
 #'
 #' @author Guilherme Garcia
 #' @export
-#' @importFrom numDeriv jacobian
 JacobianArray <- function (spline, tesselation, ...)
 {
   if (length (list (...)) > 0)
