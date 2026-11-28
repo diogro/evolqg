@@ -48,7 +48,8 @@ of response vectors correlation ('correlation_sd')
 If cov.x and cov.y are passed, same as above, but for all matrices in cov.x.
 
 If only a list is passed to cov.x, a matrix of RandomSkewers average
-values and probabilities of all comparisons.
+values and probabilities of all comparisons. All pairwise comparisons in a
+list share the same random vectors, which are drawn once per call.
 If repeat.vector is passed, comparison matrix is corrected above
 diagonal and repeatabilities returned in diagonal.
 }
@@ -72,9 +73,9 @@ c4 <- RandomMatrix(10)
 RandomSkewers(list(c1, c2, c3), c4)
 }
 \dontrun{
-#Multiple threads can be used with some foreach backend library, like doMC or doParallel
-library(doMC)
-registerDoMC(cores = 2)
+#Multiple threads can be used with some foreach backend library, like doParallel or doMC
+library(doParallel)
+registerDoParallel(cores = 2)
 RandomSkewers(list(c1, c2, c3), parallel = TRUE)
 }
 

@@ -31,6 +31,11 @@ Matrix of comparisons, matrix of probabilities.
 Generic Comparison Map functions for creating parallel list methods
 Internal functions for making eficient comparisons.
 }
+\details{
+Unnamed lists get the names 1, 2, ...; empty names are filled
+with their position and duplicated names are made unique with
+\code{\link{make.unique}}. A list with a single matrix returns 1x1 matrices.
+}
 \seealso{
 \code{\link{MantelCor}}, \code{\link{KrzCor}},\code{\link{RandomSkewers}}
 }

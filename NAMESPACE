@@ -153,14 +153,6 @@ importFrom(graphics,
   text
 )
 importFrom(methods,is)
-importFrom(mvtnorm,
-  dmvnorm,
-  rmvnorm
-)
-importFrom(reshape2,
-  acast,
-  melt
-)
 importFrom(stats,
   anova,
   confint,
@@ -187,5 +179,4 @@ importFrom(utils,
   write.csv,
   write.table
 )
-importFrom(vegan,mantel)
 useDynLib(evolqg, .registration = TRUE)

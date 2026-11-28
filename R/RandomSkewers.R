@@ -21,7 +21,8 @@
 #' If cov.x and cov.y are passed, same as above, but for all matrices in cov.x.
 #'
 #' If only a list is passed to cov.x, a matrix of RandomSkewers average
-#' values and probabilities of all comparisons.
+#' values and probabilities of all comparisons. All pairwise comparisons in a
+#' list share the same random vectors, which are drawn once per call.
 #' If repeat.vector is passed, comparison matrix is corrected above
 #' diagonal and repeatabilities returned in diagonal.
 #' @export
@@ -49,9 +50,9 @@
 #' RandomSkewers(list(c1, c2, c3), c4)
 #' }
 #' \dontrun{
-#' #Multiple threads can be used with some foreach backend library, like doMC or doParallel
-#' library(doMC)
-#' registerDoMC(cores = 2)
+#' #Multiple threads can be used with some foreach backend library, like doParallel or doMC
+#' library(doParallel)
+#' registerDoParallel(cores = 2)
 #' RandomSkewers(list(c1, c2, c3), parallel = TRUE)
 #' }
 #'
@@ -73,35 +74,57 @@ RandomSkewers.default <- function (cov.x, cov.y, num.vectors = 10000, ...) {
 #' @export
 RandomSkewers.list <- function (cov.x, cov.y = NULL, num.vectors = 10000, repeat.vector = NULL, parallel = FALSE, ...)
 {
+  if (length(cov.x) < 1) stop("cov.x must contain at least one matrix")
+  if (num.vectors < 1) stop("num.vectors must be positive")
+  traits <- nrow(cov.x[[1]])
+  if (is.null(cov.y)) {
+    .check_same_dim(cov.x, cov.x[[1]])
+  } else {
+    .check_same_dim(cov.x, cov.y)
+  }
+  # The random vectors (and the null distribution of their correlations) are
+  # drawn once and shared by all comparisons; the response of each matrix to
+  # them is computed once, with columns normalised to unit length.
+  skewers <- matrix(rnorm(traits * num.vectors), traits, num.vectors)
+  base.vector <- rnorm(traits)
+  null.dist <- .unit_columns(skewers)
+  null.dist <- as.numeric(crossprod(base.vector/sqrt(sum(base.vector^2)), null.dist))
+  responses <- function(matrices)
+    lapply(matrices, function(m) .unit_columns(m %*% skewers))
+  rs.pair <- function(x, y) {
+    cosines <- colSums(x * y)
+    avg <- mean(cosines)
+    c(correlation = avg, probability = mean(null.dist > avg), correlation_sd = sd(cosines))
+  }
   if (is.null (cov.y)) {
-    output <- ComparisonMap(cov.x,
-                         function(x, y) RandomSkewers(x, y, num.vectors),
-                         repeat.vector = repeat.vector,
-                         parallel = parallel)
+    output <- ComparisonMap(responses(cov.x), rs.pair,
+                            repeat.vector = repeat.vector,
+                            parallel = parallel)
   } else{
-    output <- SingleComparisonMap(cov.x, cov.y,
-                               function(x, y) RandomSkewers(x, y, num.vectors),
-                               parallel = parallel)
+    output <- SingleComparisonMap(responses(cov.x), responses(list(cov.y))[[1]], rs.pair,
+                                  parallel = parallel, check.dim = FALSE)
   }
   return(output)
 }
+
+# Scales each column to unit length.
+.unit_columns <- function(x) x / rep(sqrt(colSums(x^2)), each = nrow(x))
 
 #' @rdname RandomSkewers
 #' @method RandomSkewers mcmc_sample
 #' @export
 RandomSkewers.mcmc_sample <- function (cov.x, cov.y, num.vectors = 10000, parallel = FALSE, ...)
 {
-  if (is(cov.y, "mcmc_sample")) {
-    n = dim(cov.x)[1]
+  if (inherits(cov.y, "mcmc_sample")) {
+    n <- dim(cov.x)[1]
     if(dim(cov.y)[1] != n) stop("samples must be of same size")
-    cov.x <- alply(cov.x, 1)
-    output <- aaply(1:n, 1, function(i) RandomSkewers(cov.x,
-                                                      cov.y[i,,],
-                                                      num.vectors = num.vectors)$correlation,
-                    .parallel = parallel)
-    output <- as.numeric(output)
+    output <- .evq_lapply(seq_len(n), function(i) RandomSkewers(cov.x[i,,],
+                                                                cov.y[i,,],
+                                                                num.vectors = num.vectors)[["correlation"]],
+                          parallel = parallel)
+    output <- as.numeric(unlist(output))
   } else{
-    output <- SingleComparisonMap(alply(cov.x, 1), cov.y,
+    output <- SingleComparisonMap(.mcmc_to_list(cov.x), cov.y,
                                   function(x, y) RandomSkewers(x, y, num.vectors),
                                   parallel = parallel)
   }

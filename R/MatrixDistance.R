@@ -46,7 +46,7 @@ MatrixDistance <- function(cov.x, cov.y, distance, ...)
 #' @export
 MatrixDistance.default <- function (cov.x, cov.y, distance = c('OverlapDist', 'RiemannDist'), ...) {
   distance <- match.fun(match.arg(distance))
-  output <- distance(cov.x, cov.y)
+  output <- distance(cov.x, cov.y, ...)
   return(output)
 }
 
@@ -85,7 +85,12 @@ MatrixDistance.list <- function (cov.x, cov.y = NULL, distance = c('OverlapDist'
 #' @keywords matrixcomparison
 
 RiemannDist <- function(cov.x, cov.y) {
-  return (sqrt(sum(log(eigen(solve(cov.x, cov.y))$values)^2)))
+  # eigenvalues of solve(cov.x, cov.y), computed through the Cholesky
+  # factor of cov.x so that the matrix is symmetric and the values are real
+  upper <- chol(cov.x)
+  whitened <- t(backsolve(upper, t(backsolve(upper, cov.y, transpose = TRUE)), transpose = TRUE))
+  values <- eigen((whitened + t(whitened))/2, symmetric = TRUE, only.values = TRUE)$values
+  return (sqrt(sum(log(values)^2)))
 }
 
 #'Distribution overlap distance
@@ -100,11 +105,11 @@ RiemannDist <- function(cov.x, cov.y) {
 #' @return Overlap distance between cov.x and cov.y
 #' @references Ovaskainen, O. (2008). A Bayesian framework for comparative quantitative genetics. Proceedings of the Royal Society B, 669-678. doi:10.1098/rspb.2007.0949
 #' @export
-#' @importFrom mvtnorm rmvnorm dmvnorm
 OverlapDist <- function(cov.x, cov.y, iterations = 10000){
-  x_samples <- rmvnorm(iterations, sigma = cov.x)
-  y_density <- dmvnorm(x_samples, sigma = cov.y)
-  x_density <- dmvnorm(x_samples, sigma = cov.x)
-  overlap <- mean(y_density/(x_density + y_density))  
-  return(sqrt(1-overlap*2))
+  x_samples <- .rmvnorm(iterations, sigma = cov.x)
+  y_density <- .dmvnorm(x_samples, sigma = cov.y)
+  x_density <- .dmvnorm(x_samples, sigma = cov.x)
+  overlap <- mean(y_density/(x_density + y_density))
+  # rounding error can push the overlap slightly above 0.5
+  return(sqrt(max(0, 1 - overlap*2)))
 }

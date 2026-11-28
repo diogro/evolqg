@@ -35,7 +35,7 @@ Optional if cov.x is a list.}
 \item{...}{additional arguments passed to other methods}
 
 \item{ret.dim}{number of retained dimensions in the comparison,
-default for nxn matrix is n/2-1}
+default for nxn matrix is n/2-1 (rounded, and at least 1)}
 
 \item{repeat.vector}{Vector of repeatabilities for correlation correction.}
 
@@ -70,9 +70,9 @@ KrzCor(list(c1, c2, c3), c4)
 }
 
 \dontrun{
-#Multiple threads can be used with some foreach backend library, like doMC or doParallel
-library(doMC)
-registerDoMC(cores = 2)
+#Multiple threads can be used with some foreach backend library, like doParallel or doMC
+library(doParallel)
+registerDoParallel(cores = 2)
 KrzCor(list(c1, c2, c3), parallel = TRUE)
 }
 }

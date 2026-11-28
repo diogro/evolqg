@@ -25,15 +25,14 @@ PrintMatrix.default <- function(x, output.file, ...){
 #' @method PrintMatrix list
 #' @export
 PrintMatrix.list <- function(x, output.file, ...){
-    if(is.null(names(x))) names(x) <- 1:length(x)
+    if(is.null(names(x))) names(x) <- seq_along(x)
     sink(output.file, type="output")
-    invisible(
-              lapply(names(x), function(mat) {
-                     y <- x[names(x) == mat]
-                     cat(mat)
-                     cat('\n')
-                     dump(write.table(y, row.names = FALSE, col.names = FALSE, sep=","))
-                     cat('\n')
-}))
-    sink()
+    on.exit(sink())
+    for (i in seq_along(x)) {
+        cat(names(x)[i])
+        cat('\n')
+        write.table(x[[i]], row.names = FALSE, col.names = FALSE, sep=",")
+        cat('\n')
+    }
+    invisible(NULL)
 }
