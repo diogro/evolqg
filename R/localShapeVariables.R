@@ -13,10 +13,36 @@ interpol.TPS <- function (x, y)
 }
 
 interpol.L1.TPS <- function (y, X)
-  return (aaply (X, 1, interpol.TPS, y = y))
+  return (.tps_kernel (sqrt (colSums ((t (X) - y)^2)), ncol (X)))
 
 interpol.L2.TPS <- function (X, Y)
-  return (aaply (Y, 1, interpol.L1.TPS, X = X))
+  return (.tps_kernel (as.matrix (dist (Y)), ncol (Y)))
+
+# TPS kernel as a function of the distance: -r^2 log r^2 (0 at 0) in 2D, r in 3D
+.tps_kernel <- function (d, m)
+{
+  if (m == 2)
+    ifelse (d < .Machine $ double.eps, 0, - log (d ^ 2) * (d ^ 2))
+  else if (m == 3)
+    d
+  else NULL
+}
+
+# Closed form jacobian of the TPS function theta.p at point p
+.tps_jacobian <- function (p, Q, W, A)
+{
+  delta <- t (p - t (Q))                      # k x m, rows p - Q_i
+  r2 <- rowSums (delta ^ 2)
+  if (ncol (Q) == 2) {
+    # d/dp of -r2 log(r2) is -(2 log(r2) + 2) (p - Q_i)
+    coef <- ifelse (r2 < .Machine $ double.eps ^ 2, 0, - (2 * log (r2) + 2))
+  } else {
+    # d/dp of r is (p - Q_i) / r
+    r <- sqrt (r2)
+    coef <- ifelse (r < .Machine $ double.eps, 0, 1 / r)
+  }
+  A + t (W) %*% (coef * delta)
+}
 
 #' TPS transform
 #'
@@ -99,12 +125,16 @@ Rotate2MidlineMatrix <- function (X, midline)
 #' @importFrom numDeriv jacobian
 JacobianArray <- function (spline, tesselation, ...)
 {
+  if (length (list (...)) > 0)
+    warning ("Arguments in '...' were used for numerical differentiation and are now ignored: ",
+             "the jacobian is calculated analytically.")
   with (spline,
         {
           Q.tetra <- Q [tesselation, ]
           dim (Q.tetra) <- c (dim (tesselation), ncol (Q))
           Q.centroids <- apply (Q.tetra, 1, colMeans)
-          jacobs <- apply (Q.centroids, 2, jacobian, func = theta.p, ...)
+          if (!is.matrix (Q.centroids)) Q.centroids <- matrix (Q.centroids, nrow = ncol (Q))
+          jacobs <- apply (Q.centroids, 2, function (p) as.vector (.tps_jacobian (p, Q, W, A)))
           dim (jacobs) <- c (ncol (Q), ncol (Q), ncol (Q.centroids))
           return (jacobs)
         })
@@ -112,33 +142,28 @@ JacobianArray <- function (spline, tesselation, ...)
 
 #' Centered jacobian residuals
 #'
-#' Calculates mean jacobian matrix for a set of jacobian matrices
+#' Centers the log determinants of a set of jacobian matrices
 #' describing a local aspect of shape deformation for a given set of volumes,
-#' returning log determinants of deviations from mean jacobian (Woods, 2003).
+#' returning log determinants of deviations from the mean jacobian (Woods, 2003).
+#' The mean of the log determinants is the log determinant of the Karcher
+#' (log-Euclidean) mean jacobian, so the result is
+#' \code{logdet(J_i) - mean(logdet(J))}.
 #'
 #' @param jacobArray Arrays of Jacobian calculated in the JacobianArray function
 #'
-#' @returns array of centered residual jacobians
+#' @returns vector of centered log determinants of the jacobians, with mean zero
 #'
 #' @author Guilherme Garcia
 #' @author Diogo Melo
 #' @references Woods, Roger P. 2003. “Characterizing Volume and Surface
 #' Deformations in an Atlas Framework: Theory, Applications, and Implementation.” NeuroImage 18 (3):769-88.
 #' @export
-#' @importFrom expm logm
 Center2MeanJacobianFast <- function (jacobArray)
 {
-  logm.single <- function (Ai, inv.Mk) return (logm (Ai %*% inv.Mk))
-  A <- jacobArray
-  N <- dim (A) [3]
-  Mk <- MeanMatrix(A, tol = .Machine$double.eps)
-
-  inv.Mk <- solve (Mk)
-  centered.now <- apply (A, 3, logm.single, inv.Mk = inv.Mk)
-
-  centered.now <- array (centered.now, c(nrow (A), nrow (A), N))
-  log.det <- apply (centered.now, 3, function (x) return (sum (diag (x))))
-  return (log.det)
+  log.det <- vapply (seq_len (dim (jacobArray) [3]),
+                     function (i) as.numeric (determinant (jacobArray [, , i], logarithm = TRUE) $ modulus),
+                     numeric (1))
+  return (log.det - mean (log.det))
 }
 
 #' Local Shape Variables
@@ -146,50 +171,77 @@ Center2MeanJacobianFast <- function (jacobArray)
 #' Calculates the local shape variables of a set of landmarks using the sequence:
 #' - TPS transform between all shapes and the mean shape
 #' - Jacobian of the TPS transforms at the centroid of rows of the landmarks in the tesselation argument
-#' - Mean center the Jacobians using the Karcher Mean
-#' - Take the determinant of the centered jacobians
+#' - Take the log determinant of the jacobians
+#' - Mean center the log determinants (equivalent to centering the jacobians
+#'   on their Karcher mean)
 #'
 #' @param gpa Procustes aligned landmarks.
 #' @param cs Centoid sizes
-#' @param landmarks unaligned landmarks. Ignored if both gpa and cs are passed.
+#' @param landmarks unaligned landmarks. Ignored if gpa is passed. If both gpa
+#' and cs are NULL, a generalized Procrustes analysis is run on the landmarks
+#' (requires the Morpho package).
 #' @param tesselation matrix of rows of the landmarks. The centroid of each row
 #' is used to mark the position of the jacobians
 #' @param run_parallel Logical. If computation should be paralleled. Use with
-#' caution, can make things worse. Requires that at parallel back-end like doMC
+#' caution, can make things worse. Requires that at parallel back-end like doParallel
 #' be registered
+#' @param verbose Logical. If TRUE, progress messages are shown.
 #' @returns List with TPS functions, jacobian matrices, local shape variables, mean shape, centroid sizes and individual IDs
 #' @author Guilherme Garcia
 #' @author Diogo Melo
 #' @export
-#' @importFrom Morpho ProcGPA cSize arrMean3
-#' @importFrom plyr alply laply aaply
 LocalShapeVariables <- function (gpa = NULL, cs = NULL, landmarks = NULL, tesselation,
-                         run_parallel = FALSE)
+                         run_parallel = FALSE, verbose = TRUE)
 {
-  if(is.null(gpa) & is.null(cs)){
-    cat("Running GPA")
-    gpa <- ProcGPA(landmarks, CSinit = TRUE)
-    cs <- apply(landmarks, 3, cSize)
+  if(is.null(gpa)){
+    if(!is.null(cs))
+      stop("gpa must be supplied when cs is supplied. Pass both gpa and cs, or neither (with landmarks).")
+    if(is.null(landmarks))
+      stop("Supply either gpa and cs, or the unaligned landmarks.")
+    if(!requireNamespace("Morpho", quietly = TRUE))
+      stop("Running the Procrustes alignment requires the Morpho package: install Morpho or supply gpa and cs.")
+    if(verbose) message("Running GPA")
+    gpa <- Morpho::ProcGPA(landmarks, CSinit = TRUE)
+    cs <- apply(landmarks, 3, .csize)
     gpa <- gpa$rotated
     dimnames(gpa)[[3]] = dimnames(landmarks)[[3]]
+  } else if(is.null(cs)){
+    if(!is.null(landmarks)) {
+      cs <- apply(landmarks, 3, .csize)
+    } else {
+      warning("cs not supplied, computed from gpa; if gpa was scaled to unit centroid size these are all 1.")
+      cs <- apply(gpa, 3, .csize)
+    }
   }
-  mshape <- arrMean3(gpa)
+  mshape <- rowMeans(gpa, dims = 2)
   dimnames(mshape) <- dimnames(gpa)[1:2]
-  tps <- alply (gpa, 3, TPS,
-                reference.shape = mshape,
-                .parallel = run_parallel, .progress = "text")
-  print ('tps done')
-  jacobs <- laply (tps, JacobianArray, tesselation = tesselation,
-                   .parallel = run_parallel, .progress = "text")
-  jacobs <- aperm (jacobs, c(2, 3, 1, 4), resize = TRUE)
-  print ('jacobs done')
-  local <- aaply (jacobs, 4, Center2MeanJacobianFast,
-                  .parallel = run_parallel, .progress = "text")
-  local <- t (local)
+  ids <- dimnames(gpa)[[3]]
+  n.ind <- dim(gpa)[3]
+  tps <- .evq_lapply(lapply(seq_len(n.ind), function(i) gpa[, , i]),
+                     TPS, reference.shape = mshape, parallel = run_parallel)
+  names(tps) <- ids
+  names(tps) <- as.character(seq_len(n.ind))
+  if(verbose) message("tps done")
+  jacobs <- .evq_lapply(tps, JacobianArray, tesselation = tesselation,
+                        parallel = run_parallel)
+  n.dim <- ncol(mshape)
+  n.vol <- dim(jacobs[[1]])[3]
+  jacobs <- array(unlist(jacobs, use.names = FALSE), c(n.dim, n.dim, n.vol, n.ind))
+  jacobs <- aperm(jacobs, c(1, 2, 4, 3))
+  dimnames(jacobs) <- list(as.character(seq_len(n.dim)), as.character(seq_len(n.dim)),
+                           X1 = ids, as.character(seq_len(n.vol)))
+  if(verbose) message("jacobs done")
+  local <- vapply(seq_len(n.vol), function(v) Center2MeanJacobianFast(jacobs[, , , v]),
+                  numeric(n.ind))
+  local <- matrix(local, n.ind, n.vol,
+                  dimnames = list(as.character(seq_len(n.ind)), as.character(seq_len(n.vol))))
   return (list ('tps' = tps,
                 'jacobians' = jacobs,
                 'local' = local,
                 'reference' = mshape,
                 'cs' = cs,
-                'info' = dimnames(gpa)[[3]]))
+                'info' = ids))
 }
+
+# Centroid size
+.csize <- function (x) sqrt (sum (sweep (x, 2, colMeans (x)) ^ 2))

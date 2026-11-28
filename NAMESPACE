@@ -120,20 +120,11 @@ importFrom(Matrix,
   nearPD,
   solve
 )
-importFrom(Morpho,
-  ProcGPA,
-  arrMean3,
-  cSize
-)
 importFrom(Rcpp,evalCpp)
 importFrom(ape,
   cophenetic.phylo,
   nodelabels,
   reorder.phylo
-)
-importFrom(coda,
-  HPDinterval,
-  as.mcmc
 )
 importFrom(expm,
   expm,
@@ -141,6 +132,7 @@ importFrom(expm,
   sqrtm
 )
 importFrom(ggplot2,
+  .data,
   aes,
   aes_string,
   element_text,
@@ -183,19 +175,12 @@ importFrom(mvtnorm,
   rmvnorm
 )
 importFrom(numDeriv,jacobian)
-importFrom(plyr,
-  aaply,
-  alply,
-  laply
-)
 importFrom(reshape2,
   acast,
-  dcast,
   melt
 )
 importFrom(stats,
   anova,
-  as.formula,
   confint,
   cor,
   cor.test,

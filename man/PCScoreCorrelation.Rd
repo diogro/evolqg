@@ -18,14 +18,14 @@ PCScoreCorrelation(
 
 \item{taxons}{names of taxons being compared. Must be in the same order of the means.}
 
-\item{show.plots}{Logical. If TRUE, plot of eigenvalues of ancestral matrix by between group variance is showed.}
+\item{show.plots}{Logical. If TRUE, scatterplots of the scores of each pair of principal components of the ancestral matrix are also returned.}
 }
 \value{
 list of results containing:
 
 correlation matrix of principal component scores and p.values for each correlation. Lower triangle of output are correlations, and upper triangle are p.values.
 
-if show.plots is TRUE, also returns a list of plots of all projections of the nth PCs, where n is the number of taxons.
+if show.plots is TRUE, a list with the correlation matrix and a list of scatterplots of all pairs of the first n-1 PC scores, where n is the number of taxons.
 }
 \description{
 Given a set of covariance matrices and means for terminals, test the hypothesis
