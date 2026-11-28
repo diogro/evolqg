@@ -4,7 +4,13 @@
 \alias{TreeDriftTest}
 \title{Drift test along phylogeny}
 \usage{
-TreeDriftTest(tree, mean.list, cov.matrix.list, sample.sizes = NULL)
+TreeDriftTest(
+  tree,
+  mean.list,
+  cov.matrix.list,
+  sample.sizes = NULL,
+  plot = TRUE
+)
 }
 \arguments{
 \item{tree}{phylogenetic tree}
@@ -14,9 +20,11 @@ TreeDriftTest(tree, mean.list, cov.matrix.list, sample.sizes = NULL)
 \item{cov.matrix.list}{list of tip node covariance matrices. Names must match tip node labels.}
 
 \item{sample.sizes}{vector of tip nodes sample sizes}
+
+\item{plot}{Logical. If FALSE the per-node plots are not built (their \code{plot} element is NULL), which is much faster. Default is TRUE.}
 }
 \value{
-A list of regression drift tests performed in nodes with over 4 descendant tips.
+A list of regression drift tests performed in nodes with at least 4 descendant tips, named by node label (or node number when the tree has no usable node labels).
 }
 \description{
 Performs a regression drift test along a phylogeny using DriftTest function.

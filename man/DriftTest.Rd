@@ -4,7 +4,14 @@
 \alias{DriftTest}
 \title{Test drift hypothesis}
 \usage{
-DriftTest(means, cov.matrix, show.plot = TRUE, sample.sizes = NULL)
+DriftTest(
+  means,
+  cov.matrix,
+  show.plot = TRUE,
+  sample.sizes = NULL,
+  tol = NULL,
+  plot = TRUE
+)
 }
 \arguments{
 \item{means}{list or array of species means being compared. array must have means in the rows.}
@@ -17,6 +24,13 @@ DriftTest(means, cov.matrix, show.plot = TRUE, sample.sizes = NULL)
 order as \code{means}. If supplied, the expected sampling variance of the means along each eigenvector
 (eigenvalue times the average of 1/sample.sizes) is subtracted from the between group variances before
 the regression. See Details.}
+
+\item{tol}{Optional numeric. If supplied, axes whose ancestral matrix eigenvalue is below \code{tol} are dropped from
+the regression (their log values are set to NA). Eigenvalues close to zero have very large negative logs and
+become high-leverage points in the regression. Default is NULL, no axes are dropped.}
+
+\item{plot}{Logical. If FALSE the ggplot is not built and the \code{plot} element of the result is NULL, which is
+much faster (building the plot takes most of the time of the function). Default is TRUE.}
 }
 \value{
 list of results containing:
@@ -37,6 +51,10 @@ that observed divergence is larger/smaller than expected by drift alone using a 
 the between-group variances on the within-group eigenvalues.
 }
 \details{
+Non-positive eigenvalues of \code{cov.matrix} (matrices that are not positive definite) have no
+logarithm; the corresponding axes are excluded from the regression and a warning is issued. Use \code{tol} to
+also exclude near-zero eigenvalues.
+
 Means estimated from samples carry sampling variance proportional to the within-group matrix
 (W/n), so when divergence among groups is small relative to W/n the between group variances are dominated
 by sampling error and the slope tends to one regardless of the process that produced the divergence. If

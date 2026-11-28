@@ -15,7 +15,7 @@ PhyloMantel(
 )
 }
 \arguments{
-\item{tree}{phylogenetic tree. Tip labels must match names in input matrices}
+\item{tree}{phylogenetic tree. Tip labels must match row and column names of the input matrices; matrices are reordered to match \code{tree$tip.label}.}
 
 \item{matrix.1}{pair-wise comparison/distance matrix}
 
@@ -25,18 +25,20 @@ PhyloMantel(
 
 \item{permutations}{Number of permutations used in significance calculation}
 
-\item{ComparisonFunc}{comparison function, default is MatrixCor}
+\item{ComparisonFunc}{comparison function taking two matrices, used for both the observed value and the permutations. Default is the correlation between the lower triangles.}
 
 \item{k}{determines the influence of the phylogeny. 1 is strong influence, and larger values converge to a traditional mantel test.}
 }
 \value{
-returns a vector with the comparison value and the proportion of times the observed comparison is smaller than the correlations from the permutations.
+returns a vector with the comparison value and the proportion of permutations with a comparison at least as large as the observed one, computed as (number of permuted values >= observed + 1)/(permutations + 1).
 }
 \description{
 Performs a matrix correlation with significance given by a phylogenetic Mantel Test. 
 Pairs of rows and columns are permuted with probability proportional to their phylogenetic distance.
 }
 \note{
+Triangular input (e.g. the output of \code{MatrixCor} on a list) is symmetrised before permuting.
+
 This method should only be used when there is no option other than representing data as pair-wise. It suffers from low power, and alternatives should be used when available.
 }
 \examples{
@@ -48,7 +50,7 @@ comparisons = MatrixCor(cor.matrices)
 
 sp.means = dlply(dentus, .(species), function(x) colMeans(x[-5]))
 mh.dist = MultiMahalanobis(means = sp.means, cov.matrix = PhyloW(dentus.tree, cor.matrices)$'6')
-PhyloMantel(dentus.tree, comparisons, mh.dist, k = 10000)
+PhyloMantel(dentus.tree, comparisons, mh.dist, k = 10000, permutations = 100)
 
 #similar to MantelCor for large k:
 \dontrun{

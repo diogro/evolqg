@@ -141,6 +141,7 @@ importFrom(expm,
   sqrtm
 )
 importFrom(ggplot2,
+  .data,
   aes,
   aes_string,
   element_text,
@@ -172,10 +173,6 @@ importFrom(graphics,
   par,
   plot,
   text
-)
-importFrom(igraph,
-  graph.adjacency,
-  optimal.community
 )
 importFrom(methods,is)
 importFrom(mvtnorm,

@@ -16,7 +16,6 @@
 #'@return list with the 95% IC magnitude of morphological change expected through 
 #'drift and the range of the observed magnitude of morphological change
 #'@export
-#'@importFrom mvtnorm rmvnorm
 #'@examples
 #'\donttest{
 #'data(dentus)
@@ -31,25 +30,26 @@
 #' 366-385. doi: 10.1086/527498
 #'@author Ana Paula Assis
 MultivDriftTest <- function(population1, population2, G , Ne, generations, iterations = 1000){
-  populations <- list(population1, population2)
+  populations <- list(as.matrix(population1), as.matrix(population2))
   std.error <- function(x) sd(x)/sqrt(length(x))
-  means <- llply(populations, function(x) apply(x,2,mean)) 
-  se<- llply(populations,function(x) apply(x,2,std.error))
-  D <- (G * generations) / Ne 
-  population1.se <- matrix(NA, nrow = iterations, ncol = ncol(populations[[1]]))
+  means <- lapply(populations, function(x) apply(x, 2, mean)) 
+  se <- lapply(populations, function(x) apply(x, 2, std.error))
+  D <- as.matrix((G * generations) / Ne)
+  n.traits <- ncol(populations[[1]])
+  population1.se <- matrix(NA, nrow = iterations, ncol = n.traits)
   population2.se <- matrix(NA, nrow = iterations, ncol = ncol(populations[[2]]))
-  for ( i in 1: ncol(populations[[1]])) {
+  for ( i in seq_len(n.traits)) {
     population1.se[,i] <- runif(iterations, min= means[[1]][i]-se[[1]][i],
                                 max=means[[1]][i]+se[[1]][i] ) 
     population2.se[,i] <- runif(iterations, min= means[[2]][i]-se[[2]][i],
                                 max=means[[2]][i]+se[[2]][i] ) }
   
-  drift.estimate <- t(apply(population1.se, 1, rmvnorm, n = 1, sigma = D))
+  drift.estimate <- population1.se + .rmvnorm(iterations, sigma = D)
   
   drift.delta.z <- drift.estimate - population1.se
-  drift.magnitude <- apply(drift.delta.z, 1, Norm)
+  drift.magnitude <- sqrt(rowSums(drift.delta.z^2))
   empirical.delta.z <- population2.se - population1.se
-  observed.magnitude <- apply(empirical.delta.z , 1, Norm)
+  observed.magnitude <- sqrt(rowSums(empirical.delta.z^2))
   drift.quantile <- quantile(drift.magnitude, c(0.025,0.975))
   observed.magnitude <- range(observed.magnitude)
   lista <- list("magnitude of morphological change expected through drift" = drift.quantile, 

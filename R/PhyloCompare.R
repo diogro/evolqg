@@ -7,7 +7,8 @@
 #'@param ComparisonFunc comparison function, default is PCAsimilarity
 #'@param ... Additional arguments passed to ComparisonFunc
 #'@return list with a data.frame of calculated comparisons for each node, using labels or numbers from tree; and a list of comparisons for plotting using phytools (see examples)
-#'@note Phylogeny must be fully resolved
+#'@note Phylogeny must be fully resolved (binary); an error is raised otherwise. \code{node.data} must be named
+#'by node, as returned by \code{\link{PhyloW}}; nodes are looked up by name, not by position.
 #'@author Diogo Melo
 #'@export
 #'@importFrom ape reorder.phylo
@@ -29,26 +30,24 @@
 #'plotBranchbyTrait(tree, phylo.comparisons[[2]])
 #'}
 PhyloCompare <- function(tree, node.data, ComparisonFunc = PCAsimilarity, ...){
-  if(is.null(tree$node.label)){
-    node.names <- tree$tip.label
-  } else{
-    node.names <- c(tree$tip.label, tree$node.label)
-  }
+  if(!ape::is.binary(tree))
+    stop("PhyloCompare requires a fully resolved (binary) tree; use ape::multi2di() to resolve polytomies.")
+  node.names <- .phylo_node_names(tree)
+  missing.nodes <- setdiff(node.names, names(node.data))
+  if(length(missing.nodes) > 0)
+    stop("node.data is missing nodes: ", paste(missing.nodes, collapse = ", "))
   node.order <- unique(reorder(tree, "postorder")$edge[,1])
   phylo.comparisons <- list()
   tree.comparisons <- list()
   for (node in node.order){
-    if(is.na(node.names[node])){
-      node.names[node] <- as.character(node)
-    }
     current.nodes <- tree$edge[which(tree$edge[,1]==node),2]
-    phylo.comparisons[[node.names[node]]] <- ComparisonFunc(node.data[[current.nodes[1]]], node.data[[current.nodes[2]]], ...)
-    tree.comparisons[[node.names[current.nodes[1]]]] <- phylo.comparisons[[node.names[node]]][1]
-    tree.comparisons[[node.names[current.nodes[2]]]] <- phylo.comparisons[[node.names[node]]][1]
-    names(tree.comparisons)[which(names(tree.comparisons) == node.names[current.nodes[1]])] <- paste(node, current.nodes[1], sep = ',')
-    names(tree.comparisons)[which(names(tree.comparisons) == node.names[current.nodes[2]])] <- paste(node, current.nodes[2], sep = ',')
+    current <- ComparisonFunc(node.data[[node.names[current.nodes[1]]]],
+                              node.data[[node.names[current.nodes[2]]]], ...)
+    phylo.comparisons[[node.names[node]]] <- current
+    tree.comparisons[[paste(node, current.nodes[1], sep = ',')]] <- current[1]
+    tree.comparisons[[paste(node, current.nodes[2], sep = ',')]] <- current[1]
   }
-  tree.order = aaply(tree$edge, 1, function(x) paste(x, collapse = ','))
-  phylo.comparisons.df = ldply(phylo.comparisons, .id = 'node')
+  tree.order <- paste(tree$edge[,1], tree$edge[,2], sep = ',')
+  phylo.comparisons.df <- ldply(phylo.comparisons, .id = 'node')
   return(list(df = phylo.comparisons.df, tree = tree.comparisons[tree.order]))
 }

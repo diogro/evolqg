@@ -18,7 +18,8 @@ JackKnifeMINT(
   modularity.hypot,
   n = 1000,
   leave.out = floor(dim(ind.data)[1]/10),
-  ...
+  ...,
+  parallel = FALSE
 )
 }
 \arguments{
@@ -27,7 +28,8 @@ JackKnifeMINT(
 \item{modularity.hypot}{Matrix of hypothesis. Each line represents a trait and each column a module.
 if modularity.hypot[i,j] == 1, trait i is in module j.}
 
-\item{significance}{Logical. Indicates if goodness of fit test should be performed.}
+\item{significance}{Logical. Indicates if goodness of fit test should be performed. If TRUE, the output
+has two extra columns, \code{sig} and \code{p.value}. See Details.}
 
 \item{sample.size}{sample size in goodness of fit simulations via MonteCarlo}
 
@@ -39,7 +41,10 @@ if modularity.hypot[i,j] == 1, trait i is in module j.}
 
 \item{leave.out}{number of individuals to be left out of each jackknife, default is 10\%}
 
-\item{...}{additional arguments to be passed to raply for the jackknife}
+\item{...}{currently ignored}
+
+\item{parallel}{if TRUE the jackknife samples are computed in parallel. Some foreach back-end must be
+registered, like doParallel.}
 }
 \value{
 Dataframe with ranked hypothesis, ordered by the corrected gamma value
@@ -49,6 +54,20 @@ Jackknife will return the best hypothesis for each sample.
 Combines and compares many modularity hypothesis to a covariance matrix. Comparison values are
 adjusted to the number of zeros in the hypothesis using a linear regression. Best hypothesis can
 be assessed using a jack-knife procedure.
+}
+\details{
+When \code{significance = TRUE} two goodness of fit measures are returned for each hypothesis,
+both based on Monte Carlo simulations of \code{iterations} samples of size \code{sample.size} drawn from the
+hypothesised covariance matrix:
+\itemize{
+\item \code{sig}: the fraction of simulated gammas that are \emph{below} the observed gamma. Values near 1
+mean the observed matrix is farther from the hypothesis than most simulated ones, that is, a poor fit.
+\item \code{p.value}: (number of simulated gammas >= observed gamma + 1)/(\code{iterations} + 1). High
+values mean the data are consistent with the hypothesis, low values reject it. Simulated and observed
+matrices are both compared on the correlation scale.
+}
+If the best hypothesis is the null (no modules, identity matrix) a warning is issued and
+\code{Modularity_hypothesis} is the identity matrix (each trait in its own module).
 }
 \note{
 Hypothesis can be named as column names, and these will be used to make labels in the 
@@ -77,8 +96,8 @@ colnames(hypothetical.modules) <- letters[1:7]
 MINT(mod.cor, hypothetical.modules)
 
 random_var = runif(15, 1, 10)
-mod.data = mvtnorm::rmvnorm(100, sigma = sqrt(outer(random_var, random_var)) * mod.cor)
-out_jack = JackKnifeMINT(mod.data, hypothetical.modules, n = 50)
+mod.data = matrix(rnorm(100*15), 100) \%*\% chol(sqrt(outer(random_var, random_var)) * mod.cor)
+out_jack = JackKnifeMINT(mod.data, hypothetical.modules, n = 20)
 
 library(ggplot2)
 
