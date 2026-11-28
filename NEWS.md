@@ -21,6 +21,8 @@ makes many functions much faster, and cuts the dependencies roughly in half.
   functions without loading it keep working. `parallel = TRUE` still runs
   through whatever foreach backend you register (e.g. `doParallel`).
 * **`LModularity()` is defunct** (see `?"evolqg-defunct"`).
+* **Requires R >= 4.2.0** (was 4.1.0): current ggplot2 cannot be installed on older
+  versions of R.
 * Tests use testthat 3rd edition; repository moved to
   <https://github.com/diogro/evolqg>.
 
