@@ -18,7 +18,7 @@ SRD(cov.x, cov.y, ...)
 \arguments{
 \item{cov.x}{Covariance matrix being compared. cov.x can be a matrix or a list.}
 
-\item{cov.y}{Covariance matrix being compared. Ignored if cov.x is a list.}
+\item{cov.y}{Covariance matrix being compared. Ignored (with a warning) if cov.x is a list.}
 
 \item{...}{additional parameters passed to other methods}
 
@@ -47,7 +47,8 @@ vector correlations.
 Output can be plotted using PlotSRD function
 }
 \note{
-If input is a list, output is a symmetric list array with pairwise comparisons.
+If input is a list, output is a symmetric list array with pairwise comparisons. The list must have at least two matrices.
+With fewer than 40 iterations the 2.5\% and 97.5\% limits use the smallest and largest values.
 }
 \examples{
 cov.matrix.1 <- cov(matrix(rnorm(30*10), 30, 10))
@@ -58,7 +59,7 @@ srd.output <- SRD(cov.matrix.1, cov.matrix.2)
 
 #lists
 m.list <- RandomMatrix(10, 4)
-srd.array.result = SRD(m.list)
+srd.array.result = SRD(m.list, iterations = 100)
 
 #divergent traits
 colnames(cov.matrix.1)[as.logical(srd.output$model$code)]
@@ -71,9 +72,9 @@ plot(srd.array.result[1,2][[1]])
 plot(srd.array.result[3,4][[1]])
 
 \dontrun{
-#Multiple threads can be used with some foreach backend library, like doMC or doParallel
-library(doMC)
-registerDoMC(cores = 2)
+#Multiple threads can be used with some foreach backend library, like doParallel
+library(doParallel)
+registerDoParallel(cores = 2)
 SRD(m.list, parallel = TRUE)
 }
 }

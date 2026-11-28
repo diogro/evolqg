@@ -7,16 +7,16 @@
 #'@param means list or array of species means being compared. array must have means in the rows.
 #'@param cov.matrix ancestral covariance matrix for all populations
 #'@param taxons names of taxons being compared. Must be in the same order of the means.
-#'@param show.plots Logical. If TRUE, plot of eigenvalues of ancestral matrix by between group variance is showed.
+#'@param show.plots Logical. If TRUE, scatterplots of the scores of each pair of principal components of the ancestral matrix are also returned.
 #'@return list of results containing:
 #'@return correlation matrix of principal component scores and p.values for each correlation. Lower triangle of output are correlations, and upper triangle are p.values.
-#'@return if show.plots is TRUE, also returns a list of plots of all projections of the nth PCs, where n is the number of taxons.
+#'@return if show.plots is TRUE, a list with the correlation matrix and a list of scatterplots of all pairs of the first n-1 PC scores, where n is the number of taxons.
 #'@references Marroig, G., and Cheverud, J. M. (2004). Did natural selection or genetic drift 
 #'produce the cranial diversification of neotropical monkeys? The American Naturalist, 163(3), 417-428. doi:10.1086/381693
 #'@author Ana Paula Assis, Diogo Melo
 #'@export
 #'@import plyr
-#'@importFrom ggplot2 ggplot geom_text geom_smooth labs theme_bw aes_string
+#'@importFrom ggplot2 ggplot geom_text geom_smooth labs theme_bw aes .data
 #'@examples
 #' #Input can be an array with means in each row or a list of mean vectors
 #'means = array(rnorm(40*10), c(10, 40)) 
@@ -32,22 +32,24 @@
 #'}
 
 PCScoreCorrelation <- function(means, cov.matrix, taxons = names(means), show.plots = FALSE){
-  if(is.data.frame(means) | (!is.array(means) & !is.list(means)))
+  if(is.data.frame(means) || (!is.array(means) && !is.list(means)))
     stop("means must be in a list or an array.")
   if(!isSymmetric(cov.matrix)) stop("covariance matrix must be symmetric.")
   if(is.list(means)){
-    mean.array <- laply(means, identity)
+    mean.array <- do.call(rbind, means)
   }  else{ 
     mean.array <- means
     if(is.null(taxons)) taxons <- rownames(means)
   }
-  if(is.null(taxons)) taxons <- paste0("taxon", 1:nrow(mean.array))
+  if(is.null(taxons)) taxons <- paste0("taxon", seq_len(nrow(mean.array)))
+  if(length(taxons) != nrow(mean.array))
+    stop("length of taxons (", length(taxons), ") must equal the number of means (", nrow(mean.array), ").")
   n.taxon <- length(taxons)-1
   if(n.taxon > dim(cov.matrix)[1]) n.taxon <- dim(cov.matrix)[1]
   
   W.pc <- eigen(cov.matrix)
   proj.med <- as.matrix(mean.array) %*% W.pc$vectors
-  colnames(proj.med) <- paste0("PC", 1:ncol(proj.med))
+  colnames(proj.med) <- paste0("PC", seq_len(ncol(proj.med)))
   
   mat.pcs.deriva <- matrix(1 , ncol = n.taxon, nrow = n.taxon)
   if(show.plots){ 
@@ -56,8 +58,8 @@ PCScoreCorrelation <- function(means, cov.matrix, taxons = names(means), show.pl
   }
   x = NULL
   y = NULL
-  for(i in 1:n.taxon){
-    for (j in 1:i){
+  for(i in seq_len(n.taxon)){
+    for (j in seq_len(i)){
       if(j != i){
         test = cor.test(proj.med[,i], proj.med[,j])
         mat.pcs.deriva[i,j] <- test$estimate
@@ -66,8 +68,8 @@ PCScoreCorrelation <- function(means, cov.matrix, taxons = names(means), show.pl
           plots[[current.plot]] <- ggplot(data.frame(x = proj.med[,i], 
                                                      y = proj.med[,j], 
                                                      taxons = taxons),
-                                          aes(x, y)) +
-                                   geom_text(aes(label = taxons)) + 
+                                          aes(.data$x, .data$y)) +
+                                   geom_text(aes(label = .data$taxons)) + 
                                    geom_smooth(method = "lm", color = 'black') + 
                                    labs(x = paste0("PC", i), y = paste0("PC", j)) + 
                                    theme_bw()
