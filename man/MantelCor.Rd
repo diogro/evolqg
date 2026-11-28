@@ -68,7 +68,7 @@ Optional if cor.x is a list.}
 
 \item{landmark.dim}{Used if permutations should be performed maintaining landmark structure in geometric morphometric data. Either 2 for 2d data or 3 for 3d data. Default is NULL for non geometric morphomotric data.}
 
-\item{withinLandmark}{Logical. If TRUE within-landmark correlations are used in the calculation of matrix correlation. Only used if landmark.dim is passed, default is FALSE.}
+\item{withinLandmark}{Logical. If TRUE within-landmark correlations are also used in the calculation of matrix correlation (all lower triangle elements are used). Only used if landmark.dim is passed, default is FALSE.}
 
 \item{mod}{Set TRUE to use mantel in testing modularity hypothesis. Should only be used in MantelModTest.}
 
@@ -90,6 +90,35 @@ diagonal and repeatabilities returned in diagonal.
 \description{
 Calculates correlation matrix correlation and significance via Mantel test.
 }
+\details{
+MantelCor computes the Pearson correlation between the elements
+of the lower triangles (excluding the diagonal) of the two matrices. Its
+significance comes from a permutation test: the rows and columns of
+\code{cor.x} are permuted together, the correlation with \code{cor.y} is
+recomputed for each permutation, and these correlations form the null
+distribution. The p-value (reported as \code{Probability}) is
+(sum(null >= observed) + 1)/(permutations + 1), so it is never 0.
+Values equal to the observed correlation up to floating point error count as
+equal. If there are fewer than 5040 distinct permutations (7 traits or fewer),
+or more permutations are requested than exist, all distinct permutations
+(without the identity) are enumerated instead of sampled; if there are more of
+them than \code{permutations}, a random subset of that size is used, and the
+number of permutations in the formula above is the number actually used.
+
+If \code{landmark.dim} is given, the traits are grouped in landmarks of 2 or 3
+consecutive coordinates, and the permutations shuffle whole landmarks
+(keeping the coordinates of a landmark together); these permutations are
+always sampled at random. By default (\code{withinLandmark = FALSE}) only
+correlations between traits of different landmarks are used, both for the
+observed correlation and for the null distribution. With
+\code{withinLandmark = TRUE} all elements of the lower triangle are used,
+including those between coordinates of the same landmark (the diagonal is
+always excluded).
+
+If \code{cor.x} and \code{cor.y} are \code{mcmc_sample} objects, the i-th
+sample of each is compared, and a vector with one value per sample is returned
+(both are converted to correlations with \code{cov2cor}).
+}
 \note{
 If the significance is not needed, MatrixCor provides the
 correlation and skips the permutations, so it is much faster.
@@ -101,7 +130,7 @@ c3 <- RandomMatrix(10, 1, 1, 10)
 MantelCor(cov2cor(c1), cov2cor(c2))
 
 cov.list <- list(c1, c2, c3)
-cor.list <- llply(list(c1, c2, c3), cov2cor)
+cor.list <- lapply(list(c1, c2, c3), cov2cor)
 
 MantelCor(cor.list)
 
@@ -113,17 +142,17 @@ c4 <- RandomMatrix(10)
 MantelCor(cor.list, c4)
 
 \dontrun{
-#Multiple threads can be used with some foreach backend library, like doMC or doParallel
-library(doMC)
-registerDoMC(cores = 2)
+#Multiple threads can be used with some foreach backend library, like doParallel or doMC
+library(doParallel)
+registerDoParallel(cores = 2)
 MantelCor(cor.list, parallel = TRUE)
 }
 }
 \references{
-http://en.wikipedia.org/wiki/Mantel_test
+Mantel, N. (1967). The detection of disease clustering and a generalized regression approach. Cancer Research 27(2): 209-220.
 }
 \seealso{
-\code{\link{KrzCor}},\code{\link{RandomSkewers}},\code{\link[vegan]{mantel}},\code{\link{RandomSkewers}},\code{\link{TestModularity}}, \code{\link{MantelModTest}}
+\code{\link{KrzCor}},\code{\link{RandomSkewers}},\code{\link{RandomSkewers}},\code{\link{TestModularity}}, \code{\link{MantelModTest}}
 }
 \author{
 Diogo Melo, Guilherme Garcia

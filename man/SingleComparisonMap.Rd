@@ -5,7 +5,14 @@
 \title{Generic Single Comparison Map functions for creating parallel list methods
 Internal functions for making efficient comparisons.}
 \usage{
-SingleComparisonMap(matrix.list, y.mat, MatrixCompFunc, ..., parallel = FALSE)
+SingleComparisonMap(
+  matrix.list,
+  y.mat,
+  MatrixCompFunc,
+  ...,
+  parallel = FALSE,
+  check.dim = TRUE
+)
 }
 \arguments{
 \item{matrix.list}{list of matrices being compared}
@@ -17,9 +24,11 @@ SingleComparisonMap(matrix.list, y.mat, MatrixCompFunc, ..., parallel = FALSE)
 \item{...}{Additional arguments to MatrixCompFunc}
 
 \item{parallel}{if TRUE computations are done in parallel. Some foreach back-end must be registered, like doParallel or doMC.}
+
+\item{check.dim}{if TRUE (default) check that every matrix in the list has the same dimensions as y.mat.}
 }
 \value{
-Matrix of comparisons, matrix of probabilities.
+Data frame with one row per matrix in the list, and a \code{.id} column if the list is named.
 }
 \description{
 Generic Single Comparison Map functions for creating parallel list methods

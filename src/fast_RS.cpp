@@ -5,7 +5,10 @@ using namespace Rcpp;
 using namespace arma;
 
 // [[Rcpp::export]]
-arma::mat RS(arma::mat x, arma::mat y, int num_vectors) {
+arma::mat RS(const arma::mat& x, const arma::mat& y, int num_vectors) {
+  if (num_vectors < 1) Rcpp::stop("num_vectors must be positive");
+  if (x.n_cols != y.n_cols || x.n_rows != y.n_rows)
+    Rcpp::stop("x and y must have the same dimensions");
   int traits = x.n_cols, k;
   arma::vec comparisons(num_vectors);
   arma::vec null_dist(num_vectors);
@@ -29,7 +32,12 @@ arma::mat RS(arma::mat x, arma::mat y, int num_vectors) {
 }
 
 // [[Rcpp::export]]
-arma::vec delta_z_corr(arma::mat x, arma::mat y, int num_vectors, arma::mat random_vectors) {
+arma::vec delta_z_corr(const arma::mat& x, const arma::mat& y, int num_vectors, const arma::mat& random_vectors) {
+  if (num_vectors < 1) Rcpp::stop("num_vectors must be positive");
+  if (x.n_cols != y.n_cols || x.n_rows != y.n_rows)
+    Rcpp::stop("x and y must have the same dimensions");
+  if (random_vectors.n_rows != x.n_cols || random_vectors.n_cols != (arma::uword) num_vectors)
+    Rcpp::stop("random_vectors must have one row per trait and num_vectors columns");
   int k;
   arma::vec comparisons(num_vectors);
   arma::mat dz_x = x * random_vectors;

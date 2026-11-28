@@ -22,14 +22,26 @@ If cov.y is supplied, all matrices in list are compared to it.}
 \item{cov.y}{First argument is compared to cov.y.
 Optional if cov.x is a list.}
 
-\item{skewers}{matrix of column vectors to be used as gradients}
+\item{skewers}{matrix of column vectors to be used as gradients (k columns).
+A single vector is treated as a matrix with one column. Must have as many rows as the matrices have traits.}
 
 \item{...}{additional arguments passed to other methods.}
 
 \item{parallel}{if TRUE computations are done in parallel. Some foreach back-end must be registered, like doParallel or doMC.}
 }
 \value{
-vector of vector correlations between the expected responses for the two matrices for each supplied vector
+For two matrices, a vector with the correlation between the expected responses of the two matrices
+for each supplied vector, named with the column names of \code{skewers}.
+
+For a list and a single matrix \code{cov.y}, a data.frame with one row per matrix in the list
+(and a \code{.id} column if the list is named) and one column per skewer.
+
+For a list only (all pairwise comparisons): with one skewer, a list with the matrices
+\code{correlations} and \code{probabilities}, as in the other comparison methods
+(the probabilities are not defined for this method and are \code{NA}). With more than one skewer,
+an array of dimensions n x n x k, with dimnames (matrix names, matrix names, skewer names), where
+the correlation between matrices i and j (j > i) for each skewer is in \code{[j, i, ]};
+the diagonal and upper triangle are 0.
 }
 \description{
 Compares the expected response to selection for two matrices for a specific set of
@@ -43,6 +55,9 @@ n_skewers = 10
 skewers = matrix(rnorm(10*n_skewers), 10, n_skewers)
 DeltaZCorr(x, y, skewers)
 
+# all pairs in a list, one 10 x 10 matrix of correlations per skewer
+DeltaZCorr(list(x, y, RandomMatrix(10)), skewers = skewers)
+
 }
 \references{
 Cheverud, J. M., and Marroig, G. (2007). Comparing covariance matrices:
@@ -50,7 +65,7 @@ Random skewers method compared to the common principal components model.
 Genetics and Molecular Biology, 30, 461-469.
 }
 \seealso{
-\code{\link{KrzCor}},\code{\link{MantelCor}},,\code{\link{RandomSkewers}}
+\code{\link{KrzCor}},\code{\link{MantelCor}},\code{\link{RandomSkewers}}
 }
 \author{
 Diogo Melo, Guilherme Garcia

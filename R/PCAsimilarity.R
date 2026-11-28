@@ -16,7 +16,6 @@
 #' @seealso \code{\link{KrzProjection}},\code{\link{KrzCor}},\code{\link{RandomSkewers}},\code{\link{MantelCor}}
 #' @rdname PCAsimilarity
 #' @export
-#' @import plyr
 #' @examples
 #' c1 <- RandomMatrix(10)
 #' c2 <- RandomMatrix(10)
@@ -38,35 +37,42 @@ PCAsimilarity <- function(cov.x, cov.y, ...) UseMethod("PCAsimilarity")
 #' @export
 PCAsimilarity.default <- function(cov.x, cov.y, ret.dim = NULL, ...) {
   if (is.null(ret.dim))
-    ret.dim = dim(cov.x)[1]
-
-  eg.x <- eigen(cov.x)
-  eg.y <- eigen(cov.y)
-  eg.x.values <- eg.x$values[1:ret.dim]
-  eg.y.values <- eg.y$values[1:ret.dim]
-  eg.x.vectors <- eg.x$vectors[,1:ret.dim]
-  eg.y.vectors <- eg.y$vectors[,1:ret.dim]
-
-  total_var <- eg.x.values %*% eg.y.values
-
-  return (c(PCAsimilarity = sum((eg.x.values %o% eg.y.values) * ((t(eg.x.vectors) %*% (eg.y.vectors))**2))/total_var))
+    ret.dim <- nrow(cov.x)
+  c(PCAsimilarity = .pca_sim_from_eigen(.eigen_trimmed(cov.x, ret.dim),
+                                        .eigen_trimmed(cov.y, ret.dim)))
 }
+
+# Eigenvalues and eigenvectors of the first ret.dim components.
+.eigen_trimmed <- function(m, ret.dim) {
+  eg <- eigen(m, symmetric = TRUE)
+  keep <- seq_len(ret.dim)
+  list(values = eg$values[keep], vectors = eg$vectors[, keep, drop = FALSE])
+}
+
+.pca_sim_from_eigen <- function(eg.x, eg.y)
+  sum((eg.x$values %o% eg.y$values) * crossprod(eg.x$vectors, eg.y$vectors)^2) /
+    sum(eg.x$values * eg.y$values)
 
 #' @rdname PCAsimilarity
 #' @method PCAsimilarity list
 #' @export
 PCAsimilarity.list <- function (cov.x, cov.y = NULL, ...,
                          repeat.vector = NULL, parallel = FALSE) {
+  ret.dim <- list(...)[["ret.dim"]]
+  # eigen decompositions are computed once per matrix, not once per pair
+  eigen.list <- function(matrices)
+    lapply(matrices, function(m)
+      .eigen_trimmed(m, if (is.null(ret.dim)) nrow(m) else ret.dim))
+  pca.sim <- function(x, y) c(PCAsimilarity = .pca_sim_from_eigen(x, y), NA)
   if (is.null (cov.y)) {
-    output <- ComparisonMap(cov.x,
-                         function(x, y) return(c(PCAsimilarity(x, y, ...), NA)),
+    output <- ComparisonMap(eigen.list(cov.x), pca.sim,
                          repeat.vector = repeat.vector,
                          parallel = parallel)
     output <- output[[1]]
   } else{
-    output <- SingleComparisonMap(cov.x, cov.y,
-                         function(x, y) return(c(PCAsimilarity(x, y, ...), NA)),
-                               parallel = parallel)
+    .check_same_dim(cov.x, cov.y)
+    output <- SingleComparisonMap(eigen.list(cov.x), eigen.list(list(cov.y))[[1]],
+                                  pca.sim, parallel = parallel, check.dim = FALSE)
     output <- output[,-length(output)]
   }
   return(output)
@@ -77,16 +83,15 @@ PCAsimilarity.list <- function (cov.x, cov.y = NULL, ...,
 #' @export
 PCAsimilarity.mcmc_sample <- function (cov.x, cov.y, ..., parallel = FALSE)
 {
-  if (is(cov.y, "mcmc_sample")) {
-    n = dim(cov.x)[1]
+  if (inherits(cov.y, "mcmc_sample")) {
+    n <- dim(cov.x)[1]
     if(dim(cov.y)[1] != n) stop("samples must be of same size")
-    cov.x <- alply(cov.x, 1)
-    output <- aaply(1:n, 1, function(i) PCAsimilarity(cov.x, 
-                                                      cov.y[i,,], ...)$PCAsimilarity,
-                    .parallel = parallel)
-    output <- as.numeric(output)
+    output <- .evq_lapply(seq_len(n), function(i) PCAsimilarity(cov.x[i,,],
+                                                                cov.y[i,,], ...)[["PCAsimilarity"]],
+                          parallel = parallel)
+    output <- as.numeric(unlist(output))
   } else{
-    output <- SingleComparisonMap(alply(cov.x, 1), cov.y,
+    output <- SingleComparisonMap(.mcmc_to_list(cov.x), cov.y,
                                   function(x, y) PCAsimilarity(x, y, ...),
                                   parallel = parallel)
   }

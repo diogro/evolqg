@@ -178,10 +178,7 @@ importFrom(igraph,
   optimal.community
 )
 importFrom(methods,is)
-importFrom(mvtnorm,
-  dmvnorm,
-  rmvnorm
-)
+importFrom(mvtnorm,rmvnorm)
 importFrom(numDeriv,jacobian)
 importFrom(plyr,
   aaply,
@@ -189,7 +186,6 @@ importFrom(plyr,
   laply
 )
 importFrom(reshape2,
-  acast,
   dcast,
   melt
 )
