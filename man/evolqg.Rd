@@ -11,7 +11,8 @@ The package for evolutionary quantitative genetics.
 \seealso{
 Useful links:
 \itemize{
-  \item Report bugs at \url{https://github.com/lem-usp/evolqg/issues}
+  \item \url{https://github.com/diogro/evolqg}
+  \item Report bugs at \url{https://github.com/diogro/evolqg/issues}
 }
 
 }

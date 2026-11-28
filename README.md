@@ -2,7 +2,7 @@ EvolQG Package
 ======================
 
 [![CRAN status](https://www.r-pkg.org/badges/version/evolqg)](https://CRAN.R-project.org/package=evolqg)
-[![R-CMD-check](https://github.com/lem-usp/evolqg/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/lem-usp/evolqg/actions/workflows/R-CMD-check.yaml)
+[![R-CMD-check](https://github.com/diogro/evolqg/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/diogro/evolqg/actions/workflows/R-CMD-check.yaml)
 [![DOI](https://zenodo.org/badge/18354/lem-usp/EvolQG.svg)](https://zenodo.org/badge/latestdoi/18354/lem-usp/EvolQG)
 
 
@@ -26,7 +26,7 @@ On Windows you first need [Rtools](https://cran.r-project.org/bin/windows/Rtools
 
 ```R
 # install.packages("remotes")
-remotes::install_github("lem-usp/evolqg")
+remotes::install_github("diogro/evolqg")
 ```
 
 Parallel computation
@@ -43,4 +43,4 @@ MeanMatrixStatistics(RandomMatrix(10), parallel = TRUE)
 Troubleshooting
 ---------------
 
-All dependencies are available from CRAN. Please open an [issue](https://github.com/lem-usp/evolqg/issues) if the install fails for some reason.
+All dependencies are available from CRAN. Please open an [issue](https://github.com/diogro/evolqg/issues) if the install fails for some reason.
