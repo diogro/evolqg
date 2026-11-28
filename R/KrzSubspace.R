@@ -31,9 +31,8 @@
 #' avgH.vec <- eigen(avgH)$vectors
 #' MCMC.H.val = laply(Hs, function(mat) diag(t(avgH.vec) %*% mat %*% avgH.vec))
 #' 
-#' # confidence intervals for variation in shared subspace directions
-#' library(coda)
-#' HPDinterval(as.mcmc(MCMC.H.val))
+#' # 95% intervals for variation in shared subspace directions
+#' apply(MCMC.H.val, 2, quantile, c(0.025, 0.975))
 #' }
 KrzSubspace <- function(cov.matrices, k = NULL){
   p <- nrow(cov.matrices[[1]])

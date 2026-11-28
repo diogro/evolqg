@@ -5,7 +5,6 @@
 ^\.github$
 ^\.claude$
 ^README\.md$
-^NEWS-fragments$
 ^cran-comments\.md$
 ^revdep$
 ^\.DS_Store$

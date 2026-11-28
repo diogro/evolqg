@@ -70,7 +70,7 @@
 #' CalcEigenVar(cov.matrix, rel=FALSE)
 #' 
 #' # to evaluate the effect of sampling error on integration
-#' x<-mvtnorm::rmvnorm(10, sigma=cov.matrix)
+#' x <- matrix(rnorm(10 * nrow(cov.matrix)), 10) %*% chol(cov.matrix)
 #' sample_cov.matrix<-var(x)
 #' 
 #' # to contrast values of integration obtained from population covariance 
