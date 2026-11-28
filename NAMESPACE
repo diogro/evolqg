@@ -152,10 +152,6 @@ importFrom(graphics,
   plot,
   text
 )
-importFrom(igraph,
-  graph.adjacency,
-  optimal.community
-)
 importFrom(methods,is)
 importFrom(mvtnorm,
   dmvnorm,

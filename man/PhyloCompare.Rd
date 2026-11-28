@@ -22,7 +22,8 @@ list with a data.frame of calculated comparisons for each node, using labels or 
 Calculates the comparison of some statistic between sister groups along a phylogeny
 }
 \note{
-Phylogeny must be fully resolved
+Phylogeny must be fully resolved (binary); an error is raised otherwise. \code{node.data} must be named
+by node, as returned by \code{\link{PhyloW}}; nodes are looked up by name, not by position.
 }
 \examples{
 library(ape)

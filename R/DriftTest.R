@@ -11,7 +11,16 @@
 #'order as \code{means}. If supplied, the expected sampling variance of the means along each eigenvector
 #'(eigenvalue times the average of 1/sample.sizes) is subtracted from the between group variances before
 #'the regression. See Details.
-#'@details Means estimated from samples carry sampling variance proportional to the within-group matrix
+#'@param tol Optional numeric. If supplied, axes whose ancestral matrix eigenvalue is below \code{tol} are dropped from
+#'the regression (their log values are set to NA). Eigenvalues close to zero have very large negative logs and
+#'become high-leverage points in the regression. Default is NULL, no axes are dropped.
+#'@param plot Logical. If FALSE the ggplot is not built and the \code{plot} element of the result is NULL, which is
+#'much faster (building the plot takes most of the time of the function). Default is TRUE.
+#'@details Non-positive eigenvalues of \code{cov.matrix} (matrices that are not positive definite) have no
+#'logarithm; the corresponding axes are excluded from the regression and a warning is issued. Use \code{tol} to
+#'also exclude near-zero eigenvalues.
+#'
+#'Means estimated from samples carry sampling variance proportional to the within-group matrix
 #'(W/n), so when divergence among groups is small relative to W/n the between group variances are dominated
 #'by sampling error and the slope tends to one regardless of the process that produced the divergence. If
 #'\code{sample.sizes} is supplied, this expected sampling variance is subtracted. Axes whose corrected
@@ -34,7 +43,7 @@
 #'@author Ana Paula Assis, Diogo Melo
 #'@export
 #'@import plyr
-#'@importFrom ggplot2 ggplot geom_text geom_smooth labs theme_bw 
+#'@importFrom ggplot2 ggplot geom_text geom_smooth labs theme_bw aes .data
 #'@importFrom stats na.omit
 #'@examples
 #'
@@ -42,13 +51,13 @@
 #'means = array(rnorm(40*10), c(10, 40)) 
 #'cov.matrix = RandomMatrix(40, 1, 1, 10)
 #'DriftTest(means, cov.matrix)
-DriftTest <- function(means, cov.matrix, show.plot=TRUE, sample.sizes = NULL)
+DriftTest <- function(means, cov.matrix, show.plot=TRUE, sample.sizes = NULL, tol = NULL, plot = TRUE)
 {
   if(is.data.frame(means) | (!is.array(means) & !is.list(means)))
     stop("means must be in a list or an array.")
   if(!isSymmetric(cov.matrix)) stop("covariance matrix must be symmetric.")
   if(is.list(means)){
-    mean.array <- laply(means, identity)
+    mean.array <- do.call(rbind, means)
   }  else{ 
     mean.array <- means
   }
@@ -70,16 +79,28 @@ DriftTest <- function(means, cov.matrix, show.plot=TRUE, sample.sizes = NULL)
     if(sum(!is.na(B_variance)) < 3)
       stop("fewer than 3 axes with between group variance larger than the expected sampling variance.")
   }
-  log.B_variance <- log(B_variance)
-  log.W_eVals <- log(W.pc$values) 
+  keep <- rep(TRUE, length(W.pc$values))
+  if(!is.null(tol)) keep <- W.pc$values >= tol
+  if(any(W.pc$values[keep] <= 0))
+    warning("cov.matrix is not positive definite: ", sum(W.pc$values[keep] <= 0),
+            " non-positive eigenvalue(s) were excluded from the regression. See the tol argument.")
+  log.B_variance <- suppressWarnings(log(B_variance))
+  log.W_eVals <- suppressWarnings(log(W.pc$values))
+  log.B_variance[!keep] <- NA
+  log.W_eVals[!keep] <- NA
+  log.W_eVals[W.pc$values == 0] <- NA
+  log.B_variance[W.pc$values == 0] <- NA
   regression <- lm(log.B_variance~log.W_eVals)
-  reg.plot <- ggplot(na.omit(data.frame(log.B_variance, 
-                                        log.W_eVals, 
-                                        names = 1:(dim(mean.array)[2]))), 
-                     aes(log.W_eVals, log.B_variance)) + 
-              geom_text(aes(label = names)) + 
-              geom_smooth(method = "lm", color = 'black') + 
-              labs(x = "log(W Eigenvalues)", y = "log(B variances)") + theme_bw()
+  reg.plot <- NULL
+  if(plot || show.plot){
+    reg.plot <- ggplot(na.omit(data.frame(log.B_variance, 
+                                          log.W_eVals, 
+                                          names = seq_len(dim(mean.array)[2]))), 
+                       aes(.data$log.W_eVals, .data$log.B_variance)) + 
+                geom_text(aes(label = .data$names)) + 
+                geom_smooth(method = "lm", color = 'black', formula = y ~ x) + 
+                labs(x = "log(W Eigenvalues)", y = "log(B variances)") + theme_bw()
+  }
   if(show.plot) print(reg.plot)
   containsOne <- function(x) ifelse(x[1] < 1 & x[2] > 1, TRUE, FALSE)
   test <- !containsOne(confint(regression)[2,])
@@ -101,7 +122,8 @@ DriftTest <- function(means, cov.matrix, show.plot=TRUE, sample.sizes = NULL)
 #'@param mean.list list of tip node means. Names must match tip node labels.
 #'@param cov.matrix.list list of tip node covariance matrices. Names must match tip node labels.
 #'@param sample.sizes vector of tip nodes sample sizes
-#'@return A list of regression drift tests performed in nodes with over 4 descendant tips.
+#'@param plot Logical. If FALSE the per-node plots are not built (their \code{plot} element is NULL), which is much faster. Default is TRUE.
+#'@return A list of regression drift tests performed in nodes with at least 4 descendant tips, named by node label (or node number when the tree has no usable node labels).
 #'@export
 #'@seealso DriftTest PlotTreeDriftTest
 #'@author Diogo Melo
@@ -120,16 +142,21 @@ DriftTest <- function(means, cov.matrix, show.plot=TRUE, sample.sizes = NULL)
 #'
 #'#Ancestral node plot:
 #'test.list[[length(test.list)]]$plot
-TreeDriftTest <- function(tree, mean.list, cov.matrix.list, sample.sizes = NULL){
+TreeDriftTest <- function(tree, mean.list, cov.matrix.list, sample.sizes = NULL, plot = TRUE){
   if(!all(tree$tip.label %in% names(mean.list))) stop("All tip labels must be in names(mean.list).")
   if(!all(tree$tip.label %in% names(cov.matrix.list))) stop("All tip labels must be in names(cov.matrix.list).")
-  cov.matrices <- PhyloW(tree, cov.matrix.list, sample.sizes)
-  nodes <- names(cov.matrices)
-  node.mask <- laply(nodes, function(x) length(getMeans(mean.list, tree, x))) > 3
-  if(!any(node.mask)) stop("At least one node must have more than 4 descendents in mean.list")
-  test.list <- llply(nodes[node.mask], function(node) DriftTest(getMeans(mean.list, tree, node), 
-                                                                cov.matrices[[node]], FALSE))
-  names(test.list) <- nodes[node.mask]
+  node.names <- .phylo_node_names(tree) # warns once about unusable node labels
+  cov.matrices <- withCallingHandlers(PhyloW(tree, cov.matrix.list, sample.sizes),
+                                      evolqg_node_labels = function(w) invokeRestart("muffleWarning"))
+  n.tips <- length(tree$tip.label)
+  node.order <- unique(reorder(tree, "postorder")$edge[,1]) # same order as PhyloW output
+  n.desc <- vapply(node.order, function(node) length(getMeans(mean.list, tree, node)), numeric(1))
+  nodes <- node.order[n.desc >= 4]
+  if(length(nodes) == 0) stop("At least one node must have at least 4 descendents in mean.list")
+  test.list <- lapply(nodes, function(node) DriftTest(getMeans(mean.list, tree, node), 
+                                                      cov.matrices[[node.names[node]]], FALSE,
+                                                      plot = plot))
+  names(test.list) <- node.names[nodes]
   return(test.list)
 }
 
@@ -159,14 +186,17 @@ TreeDriftTest <- function(tree, mean.list, cov.matrix.list, sample.sizes = NULL)
 #'test.list <- TreeDriftTest(tree, mean.list, cov.matrix.list, sample.sizes)
 #'PlotTreeDriftTest(test.list, tree)
 PlotTreeDriftTest <- function(test.list, tree, ...){
-  tested.nodes <- as.numeric(names(test.list))
-  non.drift.nodes <- laply(test.list, function(x) x$drift_rejected)
+  tested.nodes <- match(names(test.list), .phylo_node_names(tree))
+  if(anyNA(tested.nodes)) stop("names(test.list) must be node names of tree.")
+  non.drift.nodes <- vapply(test.list, function(x) x$drift_rejected, logical(1))
   plot(tree, ...)
   nodelabels(node = tested.nodes, thermo = as.numeric(non.drift.nodes))  
 }
 
+# means of the tips descending from a node (given by node number)
 getMeans <- function(mean.list, tree, node){
-  means <- mean.list[na.omit(tree$tip.label[getDescendants(tree, node)])]
+  descendants <- getDescendants(tree, node)
+  mean.list[tree$tip.label[descendants[descendants <= length(tree$tip.label)]]]
 }
 
 # gets descendant node numbers
@@ -178,7 +208,7 @@ getDescendants<-function(tree,node,curr=NULL){
   curr<-c(curr,daughters)
   if(length(curr)==0&&node<=length(tree$tip.label)) curr<-node
   w<-which(daughters>length(tree$tip.label))
-  if(length(w)>0) for(i in 1:length(w)) 
+  if(length(w)>0) for(i in seq_along(w)) 
     curr<-getDescendants(tree,daughters[w[i]],curr)
   return(curr)
 }
