@@ -2,9 +2,9 @@
 #'
 #' Calculates the repeatability of a statistic of the data, such as
 #' correlation or covariance matrix, via bootstrap resampling with
-#' varying sample sizes, from 2 to the size of the original data.
+#' varying sample sizes, from 3 to the size of the original data.
 #'
-#' Samples of various sizes, with replacement, are taken from the full population, a statistic calculated
+#' Samples of various sizes, by default without replacement (see \code{replace}), are taken from the full population, a statistic calculated
 #' and compared to the full population statistic.
 #'
 #' A specialized plotting function displays the results in publication quality.
@@ -21,18 +21,13 @@
 #' @seealso \code{\link{BootstrapRep}}
 #' @rdname Rarefaction
 #' @export
-#' @import plyr
-#' @importFrom ggplot2 ggplot aes_string geom_boxplot scale_x_continuous scale_y_continuous theme_bw
-#' @importFrom reshape2 melt
 #' @examples
 #' ind.data <- iris[1:50,1:4]
 #'
 #' results.RS <- Rarefaction(ind.data, RandomSkewers, num.reps = 5)
-#' #' #Easy parsing of results
-#' library(reshape2)
-#' melt(results.RS)
+#' #Easy parsing of results: mean comparison per sample size
+#' sapply(results.RS, mean)
 #'
-#' # or :
 #' \donttest{
 #' results.Mantel <- Rarefaction(ind.data, MatrixCor, correlation = TRUE, num.reps = 5)
 #' results.KrzCov <- Rarefaction(ind.data, KrzCor, num.reps = 5)
@@ -41,8 +36,8 @@
 #'
 #' \dontrun{
 #' #Multiple threads can be used with some foreach backend library, like doMC or doParallel
-#' library(doMC)
-#' registerDoMC(cores = 2)
+#' library(doParallel)
+#' registerDoParallel(cores = 2)
 #' results.KrzCov <- Rarefaction(ind.data, KrzCor, num.reps = 5, parallel = TRUE)
 #'}
 #' @keywords rarefaction
@@ -62,6 +57,7 @@ Rarefaction <- function(ind.data,
                                       ComparisonFunc = function(x, y) ComparisonFunc(c2v(x),
                                                                                      c2v(y), ...),
                                       num.reps = num.reps,
+                                      replace = replace,
                                       parallel = parallel)
   return(rarefaction.list)
 }
@@ -70,9 +66,9 @@ Rarefaction <- function(ind.data,
 #'
 #' Calculates the repeatability of a statistic of the data, such as
 #' correlation or covariance matrix, via resampling with
-#' varying sample sizes, from 2 to the size of the original data.
+#' varying sample sizes, from 3 to the size of the original data.
 #'
-#' Samples of various sizes, without replacement, are taken from the full population, a statistic calculated and compared to the full population statistic.
+#' Samples of various sizes, by default without replacement (see \code{replace}), are taken from the full population, a statistic calculated and compared to the full population statistic.
 #'
 #' A specialized ploting function displays the results in publication quality.
 #' @param ind.data Matrix of residuals or indiviual measurments
@@ -83,29 +79,31 @@ Rarefaction <- function(ind.data,
 #' @param replace If true, samples are taken with replacement
 #' @param parallel if TRUE computations are done in parallel. Some foreach backend must be registered, like doParallel or doMC.
 #' @details Bootstraping may be misleading with very small sample sizes. Use with caution.
-#' @return returns the mean value of comparisons from samples to original statistic, for all sample sizes.
+#'
+#' All samples are drawn in the main process, in the same order whether or not \code{parallel = TRUE}; only the statistics and
+#' comparisons are computed in parallel. If \code{StatFunc} raises a warning for a sample, the sample is redrawn, up to 100 times,
+#' and then kept with a single summary warning. If \code{StatFunc} already warns on the full data, no samples are redrawn.
+#' Data frames are converted to matrices once when \code{StatFunc} is \code{cov} or \code{cor}.
+#' @return a list with one numeric vector (of length \code{num.reps}) for each sample size, from 3 to the number of individuals, named by sample size.
+#' Each value is the (first element of the) comparison between the statistic of a sample and the statistic of the full data.
 #' @author Diogo Melo, Guilherme Garcia
 #' @seealso \code{\link{BootstrapRep}}
 #' @export
-#' @import plyr
-#' @importFrom ggplot2 ggplot aes_string layer scale_x_continuous scale_y_continuous theme_bw
-#' @importFrom reshape2 melt
 #' @examples
 #' ind.data <- iris[1:50,1:4]
 #'
 #' #Can be used to calculate any statistic via Rarefaction, not just comparisons
 #' #Integration, for example:
-#' results.R2 <- RarefactionStat(ind.data, cor, function(x, y) CalcR2(y), num.reps = 5)
+#' results.R2 <- RarefactionStat(ind.data, cor, function(x, y) CalcEigenVar(y), num.reps = 5)
 #'
 #' #Easy access
-#' library(reshape2)
-#' melt(results.R2)
+#' sapply(results.R2, mean)
 #'
 #'\dontrun{
 #' #Multiple threads can be used with some foreach backend library, like doMC or doParallel
-#' library(doMC)
-#' registerDoMC(cores = 2)
-#' results.R2 <- RarefactionStat(ind.data, cor, function(x, y) CalcR2(y), parallel = TRUE)
+#' library(doParallel)
+#' registerDoParallel(cores = 2)
+#' results.R2 <- RarefactionStat(ind.data, cor, function(x, y) CalcEigenVar(y), parallel = TRUE)
 #'}
 #' @keywords rarefaction
 #' @keywords bootstap
@@ -119,26 +117,51 @@ RarefactionStat <- function(ind.data,
                             parallel = FALSE)
 {
   if(isSymmetric(as.matrix(ind.data))) stop("input appears to be a matrix, use residuals.")
-  observed.stat = StatFunc(ind.data)
-  num.ind = dim(ind.data)[1]
-  MapStatFunc <- function(n){
-    SampleFunction <- function(x){
-      while(TRUE){
-        local.sample = sample(1:num.ind, n, replace=replace)
-        output <- tryCatch(StatFunc(ind.data[local.sample,]), warning=function(w) w)
-        if(!is(output, "warning"))
-          return(output)
-      }
+  num.ind <- dim(ind.data)[1]
+  if(is.null(num.ind) || num.ind < 3) stop("at least 3 individuals are needed for rarefaction.")
+  # a StatFunc that already warns on the full data would make every sample warn
+  observed.warnings <- character()
+  observed.stat <- withCallingHandlers(StatFunc(ind.data), warning = function(w) {
+    observed.warnings <<- c(observed.warnings, conditionMessage(w))
+    invokeRestart("muffleWarning")
+  })
+  if(any(is.na(observed.stat)))
+    stop("The statistic calculated on the observed data has missing values. Check the data for NAs.")
+  max.retries <- 100L
+  if(length(observed.warnings) > 0) {
+    warning("StatFunc raised a warning on the observed data (", observed.warnings[1],
+            "), so samples that raise warnings are not redrawn.", call. = FALSE)
+    max.retries <- 0L
+  }
+  data <- .resampling_data(ind.data, StatFunc)
+  sizes <- 3:num.ind
+  # all samples are drawn here, in size and then repetition order
+  indices <- unlist(lapply(sizes, function(n)
+    lapply(seq_len(num.reps), function(r) sample.int(num.ind, n, replace = replace))),
+    recursive = FALSE)
+  worker <- function(idx) {
+    retries <- 0L
+    repeat {
+      warned <- FALSE
+      stat <- withCallingHandlers(StatFunc(data[idx, , drop = FALSE]), warning = function(w) {
+        warned <<- TRUE
+        invokeRestart("muffleWarning")
+      })
+      if(!warned || retries >= max.retries) break
+      retries <- retries + 1L
+      idx <- sample.int(num.ind, length(idx), replace = replace)
     }
-    return(alply(1:num.reps, 1, SampleFunction))
+    comparison <- ComparisonFunc(observed.stat, stat, ...)
+    list(out = unname(comparison[[1]]), kept.warning = warned)
   }
-  sample.stats = alply(3:num.ind, 1, MapStatFunc, .parallel = parallel)
-  names(sample.stats) <- 3:num.ind
-  MapComparisonFunc <- function(stat.list, ...){
-    ldply(stat.list, function(x, ...) ComparisonFunc(observed.stat, x, ...))[,2]
-  }
-  comparison.list = llply(sample.stats, MapComparisonFunc, .parallel = parallel)
-  return(comparison.list)
+  results <- .evq_lapply(indices, worker, parallel = parallel)
+  kept <- sum(vapply(results, function(r) r$kept.warning, logical(1)))
+  if(kept > 0 && max.retries > 0)
+    warning("StatFunc raised a warning in ", kept, " samples even after ", max.retries,
+            " redraws; those samples were kept.", call. = FALSE)
+  values <- unlist(lapply(results, function(r) r$out), use.names = FALSE)
+  if(is.null(values)) values <- numeric(0)
+  split(values, factor(rep(sizes, each = num.reps), levels = sizes))
 }
 
 #' Plot Rarefaction analysis
@@ -152,9 +175,7 @@ RarefactionStat <- function(ind.data,
 #' @author Diogo Melo, Guilherme Garcia
 #' @seealso \code{\link{BootstrapRep}}
 #' @export
-#' @import plyr
-#' @importFrom ggplot2 ggplot aes_string layer scale_x_continuous scale_y_continuous theme_bw
-#' @importFrom reshape2 melt
+#' @importFrom ggplot2 ggplot aes geom_boxplot scale_x_continuous scale_y_continuous theme_bw .data
 #'
 #' @examples
 #'\donttest{
@@ -171,12 +192,13 @@ RarefactionStat <- function(ind.data,
 #' c <- PlotRarefaction(results.KrzCov, "KrzCor")
 #' d <- PlotRarefaction(results.PCA, "PCAsimilarity")
 #'
-#' library(cowplot)
-#' plot_grid(a, b, c, d, labels = c("RS",
-#'                                  "Mantel Correlation",
-#'                                  "Krzanowski Correlation",
-#'                                  "PCA Similarity"),
-#'                       scale = 0.9)
+#' if (requireNamespace("cowplot", quietly = TRUE)) {
+#'   cowplot::plot_grid(a, b, c, d, labels = c("RS",
+#'                                             "Mantel Correlation",
+#'                                             "Krzanowski Correlation",
+#'                                             "PCA Similarity"),
+#'                      scale = 0.9)
+#' }
 #'}
 #' @keywords rarefaction
 #' @keywords bootstap
@@ -184,9 +206,11 @@ RarefactionStat <- function(ind.data,
 #' @export
 PlotRarefaction <- function(comparison.list, y.axis = "Statistic",
                             x.axis = "Number of sampled specimens"){
-  plot.df = melt(comparison.list, value.name = 'avg.corr')
-  plot.df = as.data.frame(lapply(plot.df, as.numeric))
-  rarefaction.plot = ggplot(plot.df, aes_string('L1', 'avg.corr', group = 'L1')) +
+  labels <- names(comparison.list)
+  if(is.null(labels)) labels <- seq_along(comparison.list)
+  plot.df <- data.frame(avg.corr = as.numeric(unlist(comparison.list, use.names = FALSE)),
+                        L1 = as.numeric(rep(labels, lengths(comparison.list))))
+  rarefaction.plot = ggplot(plot.df, aes(.data$L1, .data$avg.corr, group = .data$L1)) +
   geom_boxplot() +
   scale_x_continuous(x.axis) +
   scale_y_continuous(y.axis) +

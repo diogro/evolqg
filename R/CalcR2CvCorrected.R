@@ -8,6 +8,9 @@
 #' @param iterations Number of resamples to take
 #' @param parallel if TRUE computations are done in parallel. Some foreach backend must be registered, like doParallel or doMC.
 #' @param ... additional arguments passed to other methods
+#' @details For linear models with more than one predictor, individuals are grouped by the
+#' combination (interaction) of all the factors in the model. Resamples in which some group has a single
+#' individual are drawn again (up to 100 times in a row).
 #' @return List with adjusted integration indexes, fitted models and simulated distributions of integration indexes and mean coefficient of variation.
 #' @references Young, N. M., Wagner, G. P., and Hallgrimsson, B. (2010).
 #' Development and the evolvability of human limbs. Proceedings of the
@@ -18,12 +21,12 @@
 #' @rdname CalcR2CvCorrected
 #' @export
 #' @examples
-#' \dontrun{
-#' integration.dist = CalcR2CvCorrected(iris[,1:4])
+#' integration.dist = CalcR2CvCorrected(iris[,1:4], iterations = 100)
 #'
 #' #adjusted values
 #' integration.dist[[1]]
 #'
+#' \dontrun{
 #' #ploting models
 #' library(ggplot2)
 #' ggplot(integration.dist$dist, aes(r2, mean_cv)) + geom_point() +
@@ -45,8 +48,9 @@ CalcR2CvCorrected.default <- function (ind.data, cv.level = 0.06, iterations = 1
   Stats = function(x) {
     cov.matrix = var(x)
     cor.matrix = cov2cor(cov.matrix)
-    return(c(CalcR2(cor.matrix), cv(eigen(cov.matrix)$values), mean (apply (x, 2, cv))))
+    return(c(.r2(cor.matrix), cv(eigen(cov.matrix, only.values = TRUE)$values), mean (apply (x, 2, cv))))
   }
+  if(is.data.frame(ind.data)) ind.data <- as.matrix(ind.data)
   it.stats <- BootstrapStat(ind.data, iterations,
                            ComparisonFunc = function(x, y) y,
                            StatFunc = Stats,
@@ -66,30 +70,54 @@ CalcR2CvCorrected.default <- function (ind.data, cv.level = 0.06, iterations = 1
 #' @rdname CalcR2CvCorrected
 #' @method CalcR2CvCorrected lm
 #' @export
-CalcR2CvCorrected.lm <- function (ind.data, cv.level = 0.06, iterations = 1000, ...) {
+CalcR2CvCorrected.lm <- function (ind.data, cv.level = 0.06, iterations = 1000, parallel = FALSE, ...) {
     cv <- function (x) return (sd(x)/mean(x))
     model <- ind.data
-    ind.data <- model$model[[1]]
+    ind.data <- as.matrix(model$model[[1]])
     fac <- model$model[-1]
     df <- model$df.residual
     res <- residuals (model)
-    size <- dim (res)
-    r2 <- mcv <- evar <- c()
-    i <- 1
-    while (i <= iterations) {
-        current.sample <- sample ((size[1]), replace = TRUE)
-        corr <- cov2cor (var (res[current.sample,]) * (size[1] - 1)/df)
-        r2[i] <- mean (corr[lower.tri(corr)]^2)
-        evar[i] <- cv (eigen(var (res[current.sample,] * (size[1] - 1)/df))$values)
-        data <- data.frame(ind.data.s = ind.data[current.sample,], fac.s = fac[current.sample,])
-        tmp1 <- table (data$fac.s)
-        tmp2 <- ddply(data, ~ fac.s, function(x) apply(x[,1:size[2]], 2, cv))[-1]
-        tmp3 <- rowMeans(tmp2)
-        mcv[i] <- sum ((tmp3 * tmp1)/sum (tmp1))
-        if (!is.na(mcv[i]))
-            i <- i + 1
-      }
-    it.stats <- cbind(r2, evar, mcv)
+    n <- nrow (res)
+    # one group per combination of all the factors in the model
+    group <- if (ncol (fac) > 0) interaction (fac, drop = TRUE) else factor (rep (1, n))
+    group <- as.integer (group)
+
+    # Weighted mean coefficient of variation within groups. A group with a
+    # single individual has no variance, which gives NA.
+    mean.cv <- function (current.sample) {
+        g <- match (group[current.sample], sort (unique (group[current.sample])))
+        x <- ind.data[current.sample, , drop = FALSE]
+        group.n <- tabulate (g)
+        group.mean <- rowsum (x, g) / group.n
+        group.sd <- sqrt (rowsum ((x - group.mean[g, , drop = FALSE])^2, g) / (group.n - 1))
+        sum ((rowMeans (group.sd / group.mean) * group.n) / sum (group.n))
+    }
+
+    # Resampling happens here, in the main process, in the same order as
+    # always; samples with an undefined mean cv are drawn again.
+    samples <- vector ("list", iterations)
+    mcv <- numeric (iterations)
+    for (i in seq_len (iterations)) {
+        failures <- 0L
+        repeat {
+            current.sample <- sample.int (n, n, replace = TRUE)
+            mcv[i] <- mean.cv (current.sample)
+            if (!is.na (mcv[i])) break
+            failures <- failures + 1L
+            if (failures >= 100L)
+                stop ("Could not draw a bootstrap sample with at least two individuals in every group.",
+                      call. = FALSE)
+        }
+        samples[[i]] <- current.sample
+    }
+    stats <- .evq_lapply (samples, function (current.sample) {
+        sample.res <- res[current.sample, , drop = FALSE]
+        corr <- cov2cor (var (sample.res) * (n - 1)/df)
+        c (mean (corr[lower.tri (corr)]^2),
+           cv (eigen (var (sample.res * (n - 1)/df), only.values = TRUE)$values))
+    }, parallel = parallel)
+    stats <- matrix (unlist (stats, use.names = FALSE), ncol = 2, byrow = TRUE)
+    it.stats <- cbind (r2 = stats[, 1], evar = stats[, 2], mcv = mcv)
     colnames(it.stats) <- c("r2", "eVals_cv", "mean_cv")
     lm.r2 <- lm(it.stats[,1]~it.stats[,3])
     lm.eVals.cv <- lm(it.stats[,2]~it.stats[,3])

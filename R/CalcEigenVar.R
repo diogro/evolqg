@@ -11,7 +11,11 @@
 #' @param sample Default is NULL. If a integer is provided, function calculates 
 #' the expected integration value for that particular sample size and returns 
 #' value as a deviation from the expected.
-#' @param keep.positive Logical. If TRUE, non-positive eigenvalues are removed from calculation
+#' @param keep.positive Logical. If TRUE, non-positive eigenvalues are removed from calculation.
+#' The matrix is then treated as having as many dimensions as it has positive
+#' eigenvalues (its rank): the number of eigenvalues, the mean, the theoretical
+#' maximum and the sample size correction are all computed with that number
+#' instead of the number of rows.
 #' @details This function quantifies morphological integration as the dispersion 
 #' of eigenvalues in a matrix. It takes either a
 #' covariance or a correlation matrix as input, and there is no need to discern 
@@ -29,6 +33,11 @@
 #' with all eigenvalues equal). In that case, the result is given as a deviation 
 #' from the expected and is invariant to sample size (Wagner, 1984).
 #' 
+#' If \code{sd = TRUE} and \code{sample} is given, the observed variance minus its
+#' expected value can be negative (the matrix is less integrated than expected
+#' by chance). The square root is then undefined and the function returns
+#' \code{NA} with a warning.
+#'
 #' @return Integration index based on eigenvalue dispersion.
 #' @export
 #' @author Fabio Andrade Machado
@@ -80,7 +89,7 @@ CalcEigenVar<-function(matrix, sd=FALSE, rel=TRUE, sample=NULL,
                        keep.positive=TRUE) {
   if(!isSymmetric(matrix)) stop("covariance matrix must be symmetric.")
   
-  eigenv <- eigen(matrix)$values
+  eigenv <- eigen(matrix, only.values = TRUE)$values
   if(keep.positive) eigenv <- eigenv[which(zapsmall(eigenv)>0)]
   m <- mean(eigenv)
   n <- length(eigenv)
@@ -94,7 +103,11 @@ CalcEigenVar<-function(matrix, sd=FALSE, rel=TRUE, sample=NULL,
   }
   
   if (sd) {
-    obs <- sqrt(obs)
+    if (obs < 0) {
+      warning("The observed eigenvalue variance is smaller than its expected value for this sample size, ",
+              "so the standard deviation of the deviation is undefined. Returning NA.")
+      obs <- NA_real_
+    } else obs <- sqrt(obs)
     max <- sqrt(max)
   }
   

@@ -27,7 +27,8 @@ MonteCarloStat(
 \item{parallel}{if TRUE computations are done in parallel. Some foreach back-end must be registered, like doParallel or doMC.}
 }
 \value{
-returns the mean repeatability, or mean value of comparisons from samples to original statistic.
+a data frame with one row per random population: a factor column \code{X1} with the
+  population number and the comparison values (named as the result of \code{ComparisonFunc}, or V1, V2, ...).
 }
 \description{
 Using a multivariate normal model, random populations are generated
@@ -37,6 +38,11 @@ original matrix.
 }
 \details{
 Since this function uses multivariate normal model to generate populations, only covariance matrices should be used.
+
+The random populations are simulated in the main process, in the same order whether or not
+\code{parallel = TRUE}; only the statistics are computed in parallel.
+Populations whose comparison fails or is NA are redrawn up to 100 times, then an error is raised;
+a single warning reports that redraws happened.
 }
 \examples{
 cov.matrix <- RandomMatrix(5, 1, 1, 10)
@@ -50,15 +56,9 @@ r2.dist <- MonteCarloR2(RandomMatrix(10, 1, 1, 10), 30)
 quantile(r2.dist)
 
 \dontrun{
-#Multiple threads can be used with some foreach backend library, like doMC or doParallel
-##Windows:
-#cl <- makeCluster(2)
-#registerDoParallel(cl)
-
-##Mac and Linux:
+#Multiple threads can be used with some foreach backend library, like doParallel
 library(doParallel)
 registerDoParallel(cores = 2)
-
 MonteCarloStat(cov.matrix, sample.size = 30, iterations = 100,
                ComparisonFunc = function(x, y) KrzCor(x, y)[1],
                StatFunc = cov,

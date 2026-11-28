@@ -27,13 +27,21 @@ BootstrapStat(
 \item{parallel}{if TRUE computations are done in parallel. Some foreach backend must be registered, like doParallel or doMC.}
 }
 \value{
-returns the mean repeatability, that is, the mean value of comparisons from samples to original statistic.
+a data frame with one row per resample: a factor column \code{X1} with the resample number
+  and the comparison values.
 }
 \description{
 Random populations are generated via ressampling 
 using the suplied population. A statistic is calculated on the
 random population and compared to the statistic calculated on the
 original population.
+}
+\details{
+The row indices of all resamples are drawn in the main process, in the same
+  order whether or not \code{parallel = TRUE}; only the statistics are computed in parallel.
+  If \code{ind.data} is a data frame and \code{StatFunc} is \code{cov} or \code{cor} it is converted to
+  a matrix once; with any other \code{StatFunc} the resamples are data frames.
+  Resamples whose comparison fails or is NA are redrawn up to 100 times, then an error is raised.
 }
 \examples{
 cov.matrix <- RandomMatrix(5, 1, 1, 10)
