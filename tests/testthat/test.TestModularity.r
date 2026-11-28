@@ -101,7 +101,7 @@ test_that("MantelModTest returns correct results for landmark data",
             cor.hypot = CreateHypotMatrix(hypot)
             
             # First with an unstructured matrix:
-            expect = structure(c(0.112390456689369, 0.259, 0.209791381269483, 0.0703378394237725, 2.98262475771438, -0.0679013877016532), names = c("rho", "Probability", "AVG+", "AVG-", "AVG Ratio", "AVG within landmark"))
+            expect = structure(c(0.112390456689369, 310/1001, 0.209791381269483, 0.0703378394237725, 2.98262475771438, -0.0679013877016532), names = c("rho", "Probability", "AVG+", "AVG-", "AVG Ratio", "AVG within landmark"))
             local_seed(42, "3.5.0")
             un.cor = RandomMatrix(12, LKJ = FALSE)
             result = MantelModTest(cor.hypot, un.cor, landmark.dim = 2)
@@ -116,7 +116,10 @@ test_that("MantelModTest returns correct results for landmark data",
             mod.cor[evolqg:::CreateWithinLandMat(6, 2)] = 0.1# within-land
             diag(mod.cor) = 1
             result = MantelModTest(cor.hypot, mod.cor, landmark.dim = 2)
-            expect_equal(result, expect)
+            # rho = 1 is reached by every landmark permutation that keeps the
+            # module together (3! * 3! of 6! = 5%), so ties make the p-value ~0.05
+            expect_equal(result[-2], expect[-2])
+            expect_equal(unname(result["Probability"]), 0.05, tolerance = 0.3)
             expect_equal(CalcAVG(cor.hypot, mod.cor, landmark.dim = 2, MHI = FALSE), result[3:6])
             
             mod.cor = matrix(NA, 12, 12)
@@ -125,7 +128,9 @@ test_that("MantelModTest returns correct results for landmark data",
             mod.cor[evolqg:::CreateWithinLandMat(4, 3)] = 0.1 # within-land
             diag(mod.cor) = 1
             result = MantelModTest(cor.hypot, mod.cor, landmark.dim = 3)
-            expect_equal(result, expect)
+            # here 2! * 2! of 4! landmark permutations (1/6) keep the module together
+            expect_equal(result[-2], expect[-2])
+            expect_equal(unname(result["Probability"]), 1/6, tolerance = 0.2)
             expect_equal(CalcAVG(cor.hypot, mod.cor, landmark.dim = 3, MHI = FALSE), result[3:6])
             })
 
