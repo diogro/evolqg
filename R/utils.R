@@ -183,10 +183,21 @@
   if (nrow(perm.matrix) == 0L)
     return(list(statistic = statistic, signif = NA_real_, perm = numeric(0),
                 permutations = 0L))
-  perm <- apply(perm.matrix, 1, function(p) cor(x[p, p][low], y.low))
+  perm <- .mantel_perm_cor(x, y.low, low, perm.matrix)
   signif <- (sum(perm >= statistic - sqrt(.Machine$double.eps)) + 1) / (length(perm) + 1)
   list(statistic = statistic, signif = signif, perm = perm,
        permutations = length(perm))
+}
+
+# cor(x[p, p][mask], y) for every permutation p (one per row of perm.matrix),
+# computed in C++.
+.mantel_perm_cor <- function(x, y, mask, perm.matrix) {
+  idx <- which(mask, arr.ind = TRUE) # column-major, the order of x[mask]
+  perms <- t(as.matrix(perm.matrix)) # one permutation per column, contiguous
+  storage.mode(perms) <- "integer"
+  x <- as.matrix(x)
+  storage.mode(x) <- "double"
+  .mantel_perm_cor_cpp(x, as.numeric(y), idx[, 1] - 1L, idx[, 2] - 1L, perms)
 }
 
 .mantel_permutations <- function(n, permutations) {

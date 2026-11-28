@@ -104,14 +104,14 @@ MantelCor.default <- function (cor.x, cor.y, permutations = 1000, ...,
     else cor.mask <- lower.tri.land(cor.x, landmark.dim)
     correlation <- cor(cor.x [cor.mask],
                        cor.y [cor.mask])
-    null_vector <- vector("numeric", permutations)
     num.traits <- dim(cor.x)[1]
     n.land <- num.traits/landmark.dim
-    for(perm in seq_len(permutations)){
-      current.perm <- rep(sample.int(n.land) * landmark.dim, each = landmark.dim) - (landmark.dim-1):0
-      null_vector[perm] <- cor(cor.x[cor.mask],
-                               cor.y[current.perm, current.perm][cor.mask])
-    }
+    # permute whole landmarks: drawn here, one permutation per row, in the
+    # order the old per-permutation loop drew them
+    perm.matrix <- t(vapply(seq_len(permutations), function(i)
+      as.integer(rep(sample.int(n.land) * landmark.dim, each = landmark.dim) - (landmark.dim-1):0),
+      integer(num.traits)))
+    null_vector <- .mantel_perm_cor(cor.y, cor.x[cor.mask], cor.mask, perm.matrix)
     prob <- (sum(null_vector >= correlation - sqrt(.Machine$double.eps)) + 1)/(permutations + 1)
   } else{
     mantel.output <- .mantel_test(cor.x, cor.y, permutations = permutations)

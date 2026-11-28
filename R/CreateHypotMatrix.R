@@ -48,26 +48,22 @@ CombineHypot <- function(modularity.hypot){
   n.traits <- dim(modularity.hypot)[1]
   counter = 2^n.hypots - 1
   bits <- 2^((n.hypots - 1):0)
-  build <- function(mask) {
-    if(sum(mask) > 1) {
-      new_hypot <- tcrossprod(modularity.hypot[, mask, drop = FALSE])
-      new_hypot <- matrix(as.integer(new_hypot != 0), n.traits, n.traits)
-    } else {
-      x <- modularity.hypot[, mask]
-      new_hypot <- outer(x, x)
-    }
-    diag(new_hypot) <- 1
-    new_hypot
-  }
   masks <- lapply(seq_len(counter), function(i) bitwAnd(i, bits) > 0)
-  low <- lower.tri(diag(n.traits))
-  keys <- vapply(masks, function(mask) {
-    h <- build(mask)
-    paste(h[low], collapse = " ")
-  }, character(1))
-  null.key <- paste(rep(0, sum(low)), collapse = " ")
-  keep <- !duplicated(c(null.key, keys))[-1] & keys != null.key
-  hypot_list <- c(list(null = diag(n.traits)), lapply(masks[keep], build))
+  # build the combined matrices and keep the first occurrence of each distinct,
+  # non-empty one (in C++, src/fast_utils.cpp)
+  combined <- .combine_hypot_cpp(matrix(as.numeric(modularity.hypot), n.traits),
+                                 do.call(rbind, masks))
+  keep <- combined$keep
+  matrices <- combined$matrices
+  # single-hypothesis combinations were built with outer(), which kept the
+  # trait names as dimnames; keep doing that
+  trait.names <- rownames(modularity.hypot)
+  if(!is.null(trait.names)) {
+    single <- vapply(masks[keep], sum, numeric(1)) == 1
+    matrices[single] <- lapply(matrices[single], function(m) {
+      dimnames(m) <- list(trait.names, trait.names); m })
+  }
+  hypot_list <- c(list(null = diag(n.traits)), matrices)
   names(hypot_list) <- c("null", vapply(masks[keep], function(mask)
     paste(colnames(modularity.hypot)[mask], collapse = "_"), character(1)))
   attr(hypot_list, "masks") <- c(list(rep(FALSE, n.hypots)), masks[keep])

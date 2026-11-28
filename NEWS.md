@@ -99,6 +99,18 @@ makes many functions much faster, and cuts the dependencies roughly in half.
 
 ## Performance
 
+* Loops that were slow in R now run in C++ (`src/fast_utils.cpp`). Random
+  numbers are still drawn through R's generators in the same order, so seeded
+  results are unchanged:
+  * `RandomMatrix()`: both correlation generators (partial correlations, the
+    default, and `LKJ = TRUE`) are 5-10 times faster. Values agree with earlier
+    versions to about 1e-15; the old R loop's last digits depended on the BLAS.
+  * Mantel permutation tests (`MantelCor()`, with or without `landmark.dim`,
+    `MantelModTest()` and `TestModularity()`) compute the correlation for every
+    permutation in one C++ call, about 2-2.5 times faster. Permutations and
+    p-values are the same.
+  * `MINT()` and `JackKnifeMINT()` build and deduplicate the combinations of
+    hypotheses in C++ (about 5 times faster with 13 hypotheses).
 * `KrzCor()` and `PCAsimilarity()` on lists compute the eigen decomposition once per matrix instead of once per pair (about 25x for 40 matrices of 10 traits).
 * `MatrixCor()` on lists computes all correlations in one call to `cor()`.
 * `KrzProjection()` (default) uses a single matrix product instead of nested `aaply` calls; the list method computes each eigen decomposition once and parallelises only the outer loop (about 100x for 40 matrices).
