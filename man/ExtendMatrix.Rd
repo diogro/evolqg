@@ -20,7 +20,9 @@ Extended covariance matrix and second derivative variance
 Calculates the extended covariance matrix estimation as described in Marroig et al. 2012
 }
 \note{
-Covariance matrix being extended should be larger then 10x10
+Covariance matrix being extended should be larger then 10x10. Matrices with fewer than 7 traits
+are an error, because the gradient variance is computed over windows of 5 eigenvalue gradients.
+If no gradient variance falls below \code{var.cut.off} a warning is issued and the matrix is returned unextended.
 }
 \examples{
 cov.matrix = RandomMatrix(11, 1, 1, 100)

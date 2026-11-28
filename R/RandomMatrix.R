@@ -9,7 +9,11 @@
 #' @param variance Variance vector. If present will be used in all matrices
 #' @param ke Parameter for correlation matrix generation. Involves check for positive definiteness
 #' @param LKJ logical. Use LKJ distribution for generating correlation matrices.
-#' @param shape Shape parameter for the LKJ distribution. Values closer to zero leads to a more uniform distribution correlations. Higher values lead to correlations closer to zero.
+#' @param shape The LKJ parameter eta, positive. With \code{shape = 1} the correlation matrices are
+#' uniformly distributed over all correlation matrices; larger values concentrate the distribution
+#' around the identity matrix (correlations closer to zero), and values below 1 favour strong correlations.
+#' The marginal distribution of each correlation is a Beta(shape - 1 + n/2, shape - 1 + n/2)
+#' rescaled to (-1, 1), for n traits.
 #' @export
 #' @return Returns either a single matrix, or a list of matrices of equal dimension
 #' @author Diogo Melo Edgar Zanella
@@ -40,7 +44,7 @@ RandomMatrix <- function(num.traits, num.matrices = 1, min.var = 1, max.var = 1,
     } else{
         if(is.null(variance)) variance <- matrix(runif(num.matrices*num.traits, min.var, max.var), num.matrices, num.traits)
         else variance <-  matrix(rep(variance, each = num.matrices), num.matrices, num.traits)
-        rand.mat <- lapply(as.list(1:num.matrices), function(x) rcorr(num.traits, param) * sqrt(outer(variance[x,], variance[x,])))
+        rand.mat <- lapply(as.list(seq_len(num.matrices)), function(x) rcorr(num.traits, param) * sqrt(outer(variance[x,], variance[x,])))
     }
     return(rand.mat)
 }
