@@ -1,7 +1,7 @@
 # Test coverage report (printed in the job log; no external service needed).
 on:
   push:
-    branches: [master, main, v1.0]
+    branches: [master, main]
   pull_request:
 
 name: test-coverage
@@ -20,7 +20,7 @@ jobs:
           use-public-rspm: true
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          extra-packages: any::covr
+          extra-packages: any::covr, any::xml2
           needs: coverage
       - name: Test coverage
         run: |
