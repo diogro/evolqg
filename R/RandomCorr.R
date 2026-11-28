@@ -9,14 +9,15 @@
 #' @importFrom stats rbeta
 #' @keywords randommatrices
 RandCorr <- function(num.traits, ke = 10^-3){
+  if(num.traits == 1) return(matrix(1, 1, 1))
   random.corr = array(0., dim = c(num.traits, num.traits))
   b = array(0., dim = c(num.traits, num.traits))
-  b[lower.tri(b, diag = T)] = 1.
+  b[lower.tri(b, diag = TRUE)] = 1.
   random.corr[2:num.traits, 1] = -1 + 2*round(runif(num.traits-1)*10^8)/10^8
   b[2:num.traits, 1] = random.corr[2:num.traits, 1]
   for (i in 2:num.traits)
     b[i, 2:i] = sqrt(1 - random.corr[i, 1]^2)
-  for (i in 3:num.traits){
+  for (i in seq_len(num.traits)[-(1:2)]){
     for (j in 2:(i-1)){
       b1 = b[j, 1:(j-1)]%*%b[i, 1:(j-1)]
       b2 = b[j, j]*b[i, j]
@@ -43,32 +44,31 @@ RandCorr <- function(num.traits, ke = 10^-3){
     }
   }
   random.corr = random.corr + t(random.corr) + diag(rep(1, num.traits))
-  perm = sample(1:num.traits)
+  perm = sample(seq_len(num.traits))
   random.corr = (random.corr[perm,])[,perm]
   return (random.corr)
 }
 
-# https://stats.stackexchange.com/questions/2746/how-to-efficiently-generate-random-positive-semidefinite-correlation-matrices/125017
+# Random LKJ(eta) correlation matrix by the vine method of Lewandowski, Kurowicka and
+# Joe (2009): partial correlations at level m are Beta(beta, beta) on (-1, 1), with
+# beta = eta + (k - 1 - m) / 2, and are converted to raw correlations recursively.
+# eta = 1 is uniform over correlation matrices; larger eta concentrates towards the identity.
+# Ported from the .rlkj function of the stanimal package (same author).
 RandLKJ = function(num.traits, shape){
-  P = matrix(0, num.traits, num.traits)       
-  random.corr = diag(num.traits)
-
-  for (k in 1:(num.traits-1)){
-    for (i in (k+1):num.traits){
-      P[k,i] = rbeta(1, shape, shape) # sampling from beta
-      P[k,i] = (P[k,i]-0.5)*2         # linearly shifting to [-1, 1]
-      p = P[k,i]
-      for (l in seq((k-1), 1)){       # converting partial correlation to raw correlation
-        if(l != 0)
-          p = p * sqrt((1-P[l,i]^2) * (1-P[l,k]^2)) + P[l,i]*P[l,k]
-      }
-      random.corr[k,i] = p
-      random.corr[i,k] = p
+  k <- num.traits
+  if (k == 1) return(matrix(1, 1, 1))
+  P <- matrix(0, k, k)
+  random.corr <- diag(k)
+  for (m in seq_len(k - 1)){
+    beta <- shape + (k - 1 - m) / 2
+    for (i in (m + 1):k){
+      P[m, i] <- 2 * rbeta(1, beta, beta) - 1  # partial correlation on (-1, 1)
+      p <- P[m, i]
+      if (m > 1)                              # partial -> raw correlation
+        for (l in rev(seq_len(m - 1)))
+          p <- p * sqrt((1 - P[l, i]^2) * (1 - P[l, m]^2)) + P[l, i] * P[l, m]
+      random.corr[m, i] <- random.corr[i, m] <- p
     }
   }
-  
-  perm = sample(1:num.traits)
-  random.corr = (random.corr[perm,])[,perm]
-  
-  return(random.corr)
+  random.corr
 }

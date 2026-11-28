@@ -110,15 +110,9 @@ export(TPS)
 export(TestModularity)
 export(TreeDriftTest)
 import(plyr)
-importFrom(MCMCpack,riwish)
 importFrom(Matrix,
-  Matrix,
-  Schur,
   bdiag,
-  chol,
-  diag,
-  nearPD,
-  solve
+  nearPD
 )
 importFrom(Morpho,
   ProcGPA,
@@ -135,11 +129,7 @@ importFrom(coda,
   HPDinterval,
   as.mcmc
 )
-importFrom(expm,
-  expm,
-  logm,
-  sqrtm
-)
+importFrom(expm,logm)
 importFrom(ggplot2,
   aes,
   aes_string,

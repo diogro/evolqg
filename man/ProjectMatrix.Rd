@@ -13,7 +13,9 @@ ProjectMatrix(matrix, etd)
 (obtained from \code{\link{EigenTensorDecomposition}})}
 }
 \value{
-Vector of scores of given covariance matrix onto eigentensor basis.
+Vector of scores of given covariance matrix onto eigentensor basis. The scores are the
+Frobenius products of the eigentensors with the log-centered matrix, as in the \code{projection}
+of \code{\link{EigenTensorDecomposition}}, and \code{\link{RevertMatrix}} is its inverse.
 }
 \description{
 This function projects a given covariance matrix into the basis provided by an eigentensor decomposition.
@@ -51,6 +53,7 @@ ggplot() +
      data = dentus.post.proj, shape = '+', size = 3) +
   theme_bw()
 }
+
 }
 \references{
 Basser P. J., Pajevic S. 2007. Spectral decomposition of a 4th-order 

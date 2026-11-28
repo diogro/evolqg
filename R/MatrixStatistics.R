@@ -9,6 +9,9 @@
 #' @param parallel if TRUE computations are done in parallel. Some foreach backend must be registered, like doParallel or doMC.
 #' @param include.R2 Logical. If TRUE, include the legacy mean squared correlation metric in the returned output.
 #' @param include.ICV Logical. If TRUE, include the legacy ICV metric in the returned output.
+#' @details Autonomy and ConditionalEvolvability need the inverse of the covariance matrix. If the
+#' matrix is not positive definite (or is numerically singular) a warning is issued and the nearest
+#' positive definite matrix (\code{Matrix::nearPD}) is used instead, so the results are approximate.
 #' @return dist Full distribution of stochastic statistics, only if full.resuts == TRUE
 #' @return mean Mean value for all statistics
 #' @export
@@ -16,15 +19,14 @@
 #' and constraint in multivariate characters. Journal of evolutionary
 #' biology, 21(5), 1201-19. doi:10.1111/j.1420-9101.2008.01573.x
 #' @author Diogo Melo Guilherme Garcia
-#' @importFrom Matrix Matrix solve chol
 #' @examples
 #' cov.matrix <- cov(iris[,1:4])
 #' MeanMatrixStatistics(cov.matrix)
 #'
 #' \dontrun{
-#' #Multiple threads can be used with some foreach backend library, like doMC or doParallel
-#' library(doMC)
-#' registerDoMC(cores = 2)
+#' #Multiple threads can be used with some foreach backend library, like doParallel
+#' library(doParallel)
+#' registerDoParallel(cores = 2)
 #' MeanMatrixStatistics(cov.matrix, parallel = TRUE)
 #' }
 #' @keywords Autonomy
@@ -43,18 +45,17 @@ MeanMatrixStatistics <- function (cov.matrix, iterations = 1000, full.results = 
                                 'flexibility' = Flexibility,
                                 'constraints' = Constraints)
   num.traits <- dim (cov.matrix) [1]
-  if (is.null(beta.mat)) {
-    beta.mat <- array (rnorm (num.traits * iterations), c(num.traits, iterations))
-    beta.mat <- apply (beta.mat, 2, Normalize)
-  }
+  if (is.null(beta.mat))
+    beta.mat <- .random_directions(num.traits, iterations)
   iso.vec <- Normalize (rep(1, num.traits))
   null.dist <- abs (t (iso.vec) %*% beta.mat)
   null.dist <- sort (null.dist)
-  crit.value <- null.dist [round (0.95 * iterations)]
+  crit.value <- null.dist [round (0.95 * ncol(beta.mat))]
   if(full.results) cat ('critical value: ', crit.value, '\n')
   MatrixStatisticsMap <- function (CurrentFunc) CurrentFunc(cov.matrix = cov.matrix, beta.mat = beta.mat)
-  stat.dist <- t(laply (matrix.stat.functions, MatrixStatisticsMap, .parallel = parallel))
+  stat.dist <- do.call(cbind, .evq_lapply(matrix.stat.functions, MatrixStatisticsMap, parallel = parallel))
   stat.dist <- cbind (stat.dist, null.dist)
+  rownames (stat.dist) <- as.character(seq_len(nrow(stat.dist))) # as in earlier versions
   colnames (stat.dist) <- c('respondability',
                             'evolvability',
                             'conditional.evolvability',
@@ -62,12 +63,12 @@ MeanMatrixStatistics <- function (cov.matrix, iterations = 1000, full.results = 
                             'flexibility',
                             'constraints',
                             'null.dist')
-  stat.mean <- colMeans (stat.dist[,-7])
+  stat.mean <- colMeans (stat.dist[,-7, drop = FALSE])
   integration <- c (Pc1Percent (cov.matrix),
                    CalcEigenVar(cov.matrix, sd=TRUE, rel=FALSE))
   names (integration) <- c ('pc1.percent', 'EigenSd')
   if (include.R2) {
-    integration <- c (integration, "MeanSquaredCorrelation" = suppressWarnings(CalcR2(cov.matrix)))
+    integration <- c (integration, "MeanSquaredCorrelation" = .r2(cov.matrix))
   }
   if (include.ICV) {
     integration <- c (integration, "ICV" = suppressWarnings(CalcICV(cov.matrix)))
@@ -81,81 +82,91 @@ MeanMatrixStatistics <- function (cov.matrix, iterations = 1000, full.results = 
 
 #' @export
 #' @rdname MeanMatrixStatistics
-#' @importFrom Matrix Matrix solve chol nearPD diag
+#' @importFrom Matrix nearPD
 Autonomy <- function (cov.matrix, beta.mat = NULL, iterations = 1000){
-  cov.matrix <- Matrix(cov.matrix)
   num.traits <- dim (cov.matrix) [1]
-  if(is.null(beta.mat)){
-    beta.mat <- array (rnorm (num.traits * iterations), c(num.traits, iterations))
-    beta.mat <- apply (beta.mat, 2, Normalize)
-  }
-  cov.matrix = tryCatch({cv = chol(cov.matrix); cov.matrix}, error = function(cond){
-    warning("matrix is singular, can't compute autonomy directly. Using nearPD, results could be wrong")
-    cov.matrix <- nearPD(cov.matrix)[[1]]
-    chol(cov.matrix)
-  })
-   (1/diag(t (beta.mat) %*% solve (cov.matrix, beta.mat))) / diag(t (beta.mat) %*% cov.matrix %*% beta.mat)
+  if(is.null(beta.mat))
+    beta.mat <- .random_directions(num.traits, iterations)
+  beta.mat <- as.matrix(beta.mat)
+  dec <- .chol_or_nearpd(cov.matrix, "autonomy")
+  inv.quad <- colSums(backsolve(dec$chol, beta.mat, transpose = TRUE)^2)
+  (1 / inv.quad) / colSums(beta.mat * (dec$cov.matrix %*% beta.mat))
 }
 #' @export
 #' @rdname MeanMatrixStatistics
-#' @importFrom Matrix Matrix solve chol nearPD diag
+#' @importFrom Matrix nearPD
 ConditionalEvolvability <- function (cov.matrix, beta.mat = NULL, iterations = 1000){
-  cov.matrix <- Matrix(cov.matrix)
   num.traits <- dim (cov.matrix) [1]
-  if(is.null(beta.mat)){
-    beta.mat <- array (rnorm (num.traits * iterations), c(num.traits, iterations))
-    beta.mat <- apply (beta.mat, 2, Normalize)
-  }
-  cov.matrix = tryCatch({chol(cov.matrix); cov.matrix}, error = function(cond){
-    warning("matrix is singular, can't compute conditional evolvability directly. Using nearPD, results could be wrong")
-    cov.matrix <- nearPD(cov.matrix)[[1]]
-    chol(cov.matrix)
-  })
-  return (1/diag(t (beta.mat) %*% solve (cov.matrix, beta.mat)))
+  if(is.null(beta.mat))
+    beta.mat <- .random_directions(num.traits, iterations)
+  beta.mat <- as.matrix(beta.mat)
+  dec <- .chol_or_nearpd(cov.matrix, "conditional evolvability")
+  1 / colSums(backsolve(dec$chol, beta.mat, transpose = TRUE)^2)
 }
 #' @export
 #' @rdname MeanMatrixStatistics
 Constraints <- function  (cov.matrix, beta.mat = NULL, iterations = 1000){
   num.traits <- dim (cov.matrix) [1]
-  if(is.null(beta.mat)){
-    beta.mat <- array (rnorm (num.traits * iterations), c(num.traits, iterations))
-    beta.mat <- apply (beta.mat, 2, Normalize)
-  }
-  PC1 <- eigen(cov.matrix)$vectors[,1]
-  Cb <- apply(cov.matrix %*% beta.mat, 2, Normalize)
-  abs(apply(Cb, 2, `%*%`, PC1))
+  if(is.null(beta.mat))
+    beta.mat <- .random_directions(num.traits, iterations)
+  beta.mat <- as.matrix(beta.mat)
+  PC1 <- eigen(cov.matrix, symmetric = TRUE)$vectors[,1]
+  CB <- cov.matrix %*% beta.mat
+  abs(as.vector(crossprod(PC1, CB)) / sqrt(colSums(CB^2)))
 }
 #' @export
 #' @rdname MeanMatrixStatistics
 Evolvability <- function (cov.matrix, beta.mat = NULL, iterations = 1000){
   num.traits <- dim (cov.matrix) [1]
-  if(is.null(beta.mat)){
-    beta.mat <- array (rnorm (num.traits * iterations), c(num.traits, iterations))
-    beta.mat <- apply (beta.mat, 2, Normalize)
-  }
-  diag(t(beta.mat) %*% cov.matrix %*% beta.mat)
+  if(is.null(beta.mat))
+    beta.mat <- .random_directions(num.traits, iterations)
+  beta.mat <- as.matrix(beta.mat)
+  colSums(beta.mat * (cov.matrix %*% beta.mat))
 }
 #' @export
 #' @rdname MeanMatrixStatistics
 Flexibility <- function (cov.matrix, beta.mat = NULL, iterations = 1000){
   num.traits <- dim (cov.matrix) [1]
-  if(is.null(beta.mat)){
-    beta.mat <- array (rnorm (num.traits * iterations), c(num.traits, iterations))
-    beta.mat <- apply (beta.mat, 2, Normalize)
-  }
-  Cb <- apply(cov.matrix %*% beta.mat, 2, Normalize)
-  diag(t (beta.mat) %*% Cb)
-  }
+  if(is.null(beta.mat))
+    beta.mat <- .random_directions(num.traits, iterations)
+  beta.mat <- as.matrix(beta.mat)
+  CB <- cov.matrix %*% beta.mat
+  colSums(beta.mat * CB) / sqrt(colSums(CB^2))
+}
 #' @export
 #' @rdname MeanMatrixStatistics
-Pc1Percent <- function (cov.matrix) return (eigen (cov.matrix)$values [1] / sum (eigen (cov.matrix)$values))
+Pc1Percent <- function (cov.matrix) {
+  values <- eigen(cov.matrix, symmetric = TRUE, only.values = TRUE)$values
+  values[1] / sum(values)
+}
 #' @export
 #' @rdname MeanMatrixStatistics
 Respondability <- function (cov.matrix, beta.mat = NULL, iterations = 1000) {
   num.traits <- dim (cov.matrix) [1]
-  if(is.null(beta.mat)){
-    beta.mat <- array (rnorm (num.traits * iterations), c(num.traits, iterations))
-    beta.mat <- apply (beta.mat, 2, Normalize)
-  }
-  apply(cov.matrix %*% beta.mat, 2, Norm)
+  if(is.null(beta.mat))
+    beta.mat <- .random_directions(num.traits, iterations)
+  beta.mat <- as.matrix(beta.mat)
+  sqrt(colSums((cov.matrix %*% beta.mat)^2))
 }
+
+# Random unit-length directions, one per column. Same random stream as
+# normalising columns of rnorm(), and always a matrix, even for one trait.
+.random_directions <- function(num.traits, iterations) {
+  beta.mat <- matrix(rnorm(num.traits * iterations), num.traits, iterations)
+  beta.mat / rep(sqrt(colSums(beta.mat^2)), each = num.traits)
+}
+
+# Cholesky factor of a covariance matrix, falling back to the nearest positive
+# definite matrix when the matrix is singular (or numerically so).
+.chol_or_nearpd <- function(cov.matrix, what) {
+  cov.matrix <- as.matrix(cov.matrix)
+  R <- tryCatch(chol(cov.matrix), error = function(cond) NULL)
+  if (is.null(R) || min(diag(R)) <= sqrt(.Machine$double.eps) * max(diag(R))) {
+    warning("matrix is singular, can't compute ", what,
+            " directly. Using nearPD, results could be wrong")
+    cov.matrix <- as.matrix(nearPD(cov.matrix)$mat)
+    R <- chol(cov.matrix)
+  }
+  list(cov.matrix = cov.matrix, chol = R)
+}
+

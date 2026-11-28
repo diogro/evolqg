@@ -6,7 +6,9 @@
 #' @param etd Eigentensor decomposition of m covariance matrices for k traits
 #' (obtained from \code{\link{EigenTensorDecomposition}})
 #' 
-#' @return Vector of scores of given covariance matrix onto eigentensor basis.
+#' @return Vector of scores of given covariance matrix onto eigentensor basis. The scores are the
+#' Frobenius products of the eigentensors with the log-centered matrix, as in the \code{projection}
+#' of \code{\link{EigenTensorDecomposition}}, and \code{\link{RevertMatrix}} is its inverse.
 #' 
 #' @references Basser P. J., Pajevic S. 2007. Spectral decomposition of a 4th-order 
 #' covariance tensor: Applications to diffusion tensor MRI. Signal Processing. 87:220-236.
@@ -50,15 +52,16 @@
 #'      data = dentus.post.proj, shape = '+', size = 3) +
 #'   theme_bw()
 #' }
-#' @importFrom expm logm sqrtm
 #'
 #' @export
 #' 
 ProjectMatrix <-
   function (matrix, etd)
   {
-    mean.is <- solve (etd $ mean.sqrt)
-    log.center.mat <- logm (mean.is %*% matrix %*% mean.is)
-    projection <- aaply (etd $ matrices, 3, frobenius.prod, y = log.center.mat)
+    mean.is <- .sym_matfun (etd $ mean.sqrt, function (l) 1 / l)
+    log.center.mat <- .sym_logm (mean.is %*% matrix %*% mean.is)
+    k <- nrow(log.center.mat)
+    projection <- as.vector (crossprod (matrix (etd $ matrices, k * k), as.vector (log.center.mat)))
+    names (projection) <- dimnames (etd $ matrices) [[3]]
     projection
   }

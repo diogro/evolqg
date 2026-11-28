@@ -37,9 +37,19 @@ projection matrix of unstandardized projected covariance matrices over eigentens
 This function performs eigentensor decomposition on a set of covariance matrices.
 }
 \details{
-The number of estimated eigentensors is the minimum between the number of data points (m) and 
-the number of independent variables (k(k + 1)/2) minus one, in a similar manner to the usual 
+The number of estimated eigentensors is the minimum between the number of data points (m) minus one and 
+the number of independent variables (k(k + 1)/2), in a similar manner to the usual 
 principal component analysis.
+
+All computations are done in the affine-invariant (log-Euclidean) space around the Riemannian mean
+of the matrices: each matrix A is mapped to \eqn{\log(M^{-1/2} A M^{-1/2})}, with M the mean from
+\code{\link{MeanMatrix}}, and the covariance tensor Sigma of these log-centered matrices
+is decomposed. The eigentensors are therefore orthonormal (Frobenius norm) symmetric matrices in
+this space, the eigenvalues are the variances of the projections, and the projections are
+uncorrelated PCA-like scores (they have mean zero, since the mean is the Karcher mean).
+\code{\link{ProjectMatrix}} and \code{\link{RevertMatrix}} move between matrices and scores in
+this same space. (Versions before 1.0 built Sigma from the raw matrix elements, but projected
+log-centered matrices, so values, tensors and scores did not correspond to each other.)
 }
 \examples{
 data(dentus)
@@ -81,6 +91,7 @@ dentus.post.eval <- laply (dentus.post.etd, function (L) L $ values)
 boxplot(dentus.post.eval, xlab = 'Index', ylab = 'Value', 
         main = 'Posterior Eigenvalue Distribution')
 }
+
 }
 \references{
 Basser P. J., Pajevic S. 2007. Spectral decomposition of a 4th-order 

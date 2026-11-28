@@ -13,9 +13,19 @@
 #' @return matrices array of eigentensor in matrix form;
 #' @return projection matrix of unstandardized projected covariance matrices over eigentensors.
 #' 
-#' @details The number of estimated eigentensors is the minimum between the number of data points (m) and 
-#' the number of independent variables (k(k + 1)/2) minus one, in a similar manner to the usual 
+#' @details The number of estimated eigentensors is the minimum between the number of data points (m) minus one and 
+#' the number of independent variables (k(k + 1)/2), in a similar manner to the usual 
 #' principal component analysis.
+#'
+#' All computations are done in the affine-invariant (log-Euclidean) space around the Riemannian mean
+#' of the matrices: each matrix A is mapped to \eqn{\log(M^{-1/2} A M^{-1/2})}, with M the mean from
+#' \code{\link{MeanMatrix}}, and the covariance tensor Sigma of these log-centered matrices
+#' is decomposed. The eigentensors are therefore orthonormal (Frobenius norm) symmetric matrices in
+#' this space, the eigenvalues are the variances of the projections, and the projections are
+#' uncorrelated PCA-like scores (they have mean zero, since the mean is the Karcher mean).
+#' \code{\link{ProjectMatrix}} and \code{\link{RevertMatrix}} move between matrices and scores in
+#' this same space. (Versions before 1.0 built Sigma from the raw matrix elements, but projected
+#' log-centered matrices, so values, tensors and scores did not correspond to each other.)
 #' 
 #' @references Basser P. J., Pajevic S. 2007. Spectral decomposition of a 4th-order 
 #' covariance tensor: Applications to diffusion tensor MRI. Signal Processing. 87:220-236.
@@ -66,7 +76,6 @@
 #' boxplot(dentus.post.eval, xlab = 'Index', ylab = 'Value', 
 #'         main = 'Posterior Eigenvalue Distribution')
 #' }
-#' @importFrom expm logm sqrtm
 #'
 #' @rdname EigenTensorDecomposition 
 #' @export
@@ -78,8 +87,10 @@ EigenTensorDecomposition <- function (matrices, return.projection = TRUE, ...) U
 #' @export
 EigenTensorDecomposition.list <- function (matrices, return.projection = TRUE, ...)
   {
-    list2array <- laply(matrices, function(L) L)
-    list2array <- aperm (list2array, c (2, 3, 1))
+    k <- nrow(matrices[[1]])
+    list2array <- array(unlist(matrices, use.names = FALSE), c(k, k, length(matrices)),
+                        dimnames = list(rownames(matrices[[1]]), colnames(matrices[[1]]),
+                                        names(matrices)))
     EigenTensorDecomposition(list2array, return.projection, ...)
   }
 
@@ -88,52 +99,59 @@ EigenTensorDecomposition.list <- function (matrices, return.projection = TRUE, .
 #' @export
 EigenTensorDecomposition.default <- function (matrices, return.projection = TRUE, ...)
   {
+    n.traits <- dim(matrices) [1]
+    n.matrix <- dim(matrices) [3]
     mean.matrix <- MeanMatrix(matrices, ...)
-    mean.sqrt <- sqrtm(mean.matrix)
-    mean.is <- solve(mean.sqrt)
-    lce.array <- aaply(matrices, 3, 
-                       function (A) logm(mean.is %*% A %*% mean.is))  
-    lce.array <- aperm(lce.array, c(2, 3, 1))
-    n.traits <- dim(lce.array) [1]
-    n.matrix <- dim(lce.array) [3]
-    
-    ### Build Sigma
-    variances <- aaply (matrices, 3, diag)
-    covariances <- aaply (matrices, 3, function (x) x [lower.tri (x)])
-    block.var <- var (variances)
-    block.off <- cov (variances, covariances)
-    block.cov <- var (covariances)
-    upper.block <- cbind (block.var, sqrt (2) * block.off)
-    lower.block <- cbind (sqrt (2) * t (block.off), 2 * block.cov)
-    Sigma <- rbind (upper.block, lower.block)
-    
+    mean.sqrt <- .sym_sqrtm(mean.matrix)
+    mean.is <- .sym_inv_sqrtm(mean.matrix)
+
+    ### log-centered matrices, k x k x m
+    lce.array <- array(0, dim(matrices))
+    for (i in seq_len(n.matrix))
+      lce.array[, , i] <- .sym_logm(mean.is %*% matrices[, , i] %*% mean.is)
+
+    ### Build Sigma in the log-centered space. Each matrix is a vector with the
+    ### diagonal followed by the lower triangle times sqrt(2), so that the
+    ### Euclidean product of vectors is the Frobenius product of matrices.
+    lower <- lower.tri(diag(n.traits))
+    n.vars <- n.traits + sum(lower)
+    vec.lce <- vapply(seq_len(n.matrix),
+                      function (i) c(diag(matrix(lce.array[, , i], n.traits)),
+                                     sqrt(2) * lce.array[, , i][lower]),
+                      numeric(n.vars))
+    vec.lce <- t(matrix(vec.lce, n.vars, n.matrix))
+    Sigma <- var (vec.lce)
+
     n.tensor <- min (n.matrix - 1, dim (Sigma) [1])
-    eigen.dec <- eigen (Sigma)
-    eigen.matrices <-
-      aaply (eigen.dec $ vectors [, 1:n.tensor], 2, ### ematrices with non-zero evals
-             function (x)
-             {
-               eigen.mat <- diag (x [1:n.traits])
-               eigen.mat [lower.tri (eigen.mat)] <-
-                 x [(n.traits+1):length (x)] / sqrt (2)
-               eigen.mat <- eigen.mat + t(eigen.mat)
-               diag (eigen.mat) <- diag (eigen.mat) / 2
-               eigen.mat
-             })
-    eigen.matrices <- aperm (eigen.matrices, c(2, 3, 1), resize = TRUE)
+    eigen.dec <- eigen (Sigma, symmetric = TRUE)
+    et.vectors <- eigen.dec $ vectors [, seq_len(n.tensor), drop = FALSE]
+    eigen.matrices <- array(0, c(n.traits, n.traits, n.tensor))
+    for (j in seq_len(n.tensor))
+      {
+        eigen.mat <- matrix(0, n.traits, n.traits)
+        eigen.mat [lower] <- et.vectors [-seq_len(n.traits), j] / sqrt (2)
+        eigen.mat <- eigen.mat + t(eigen.mat)
+        diag (eigen.mat) <- et.vectors [seq_len(n.traits), j]
+        eigen.matrices [, , j] <- eigen.mat
+      }
     dimnames (eigen.matrices) <-
       list (rownames (matrices),
             colnames (matrices),
-            paste ('ET', 1:n.tensor, sep = ''))
+            paste ('ET', seq_len(n.tensor), sep = ''))
     
     out <- list ('mean' = mean.matrix,
                  'mean.sqrt' = mean.sqrt,
-                 'values' = eigen.dec $ values [1:n.tensor],
+                 'values' = eigen.dec $ values [seq_len(n.tensor)],
                  'matrices' = eigen.matrices)
    
     if (return.projection)
-      out $ projection <- aaply (lce.array, 3, 
-                          function (A, B) aaply (B, 3, frobenius.prod, y = A),
-                          B = eigen.matrices)
+      {
+        projection <- crossprod (matrix (lce.array, n.traits^2), matrix (eigen.matrices, n.traits^2))
+        dn <- list (dimnames (matrices) [[3]], dimnames (eigen.matrices) [[3]])
+        if (!is.null (names (dimnames (matrices))))
+          names (dn) <- c (names (dimnames (matrices)) [3], "")
+        dimnames (projection) <- dn
+        out $ projection <- projection
+      }
     return (out)
   }
